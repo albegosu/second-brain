@@ -18,6 +18,37 @@ Shortcut ──► Supabase (inbox) ──► GitHub Actions (worker + Ollama Cl
                                                                          second-brain skill
 ```
 
+## Quick start
+
+You need a GitHub account with [gh](https://cli.github.com) logged in, a free
+[Supabase](https://supabase.com) project, an [Ollama](https://ollama.com) API key
+and an iPhone or Mac with Shortcuts.
+
+1. Get the engine:
+
+   ```bash
+   git clone https://github.com/albegosu/second-brain ~/Developer/second-brain
+   cd ~/Developer/second-brain
+   ```
+
+2. Create your private wiki repository and wire everything to it. It asks for
+   the Supabase project, an optional Supabase access token (to set up the
+   database for you) and the Ollama key:
+
+   ```bash
+   bin/new-wiki
+   ```
+
+3. Open `shortcut/Save to second-brain.shortcut` and answer its three questions
+   with the values `bin/new-wiki` prints at the end.
+4. Optionally, subscribe to the printed topic in the [ntfy](https://ntfy.sh) app
+   to get a push when each capture is filed.
+5. Share a post or a page. A few minutes later it's in your wiki, and Claude
+   reads it through the `second-brain` skill.
+
+The rest of this README explains the pieces, how to set them up by hand, and how
+to run the worker on your own computer instead.
+
 ## The wiki
 
 It lives in its own private repository (`second-brain-wiki`), together with the
@@ -105,6 +136,7 @@ ollama pull gemma4:31b-cloud  # vision and writing; the only free one on the fre
 ```
 
 **Worker on GitHub Actions (recommended).** It doesn't depend on any computer.
+`bin/new-wiki` sets all of this up (see Quick start); these are the steps it takes.
 The workflows live in the private wiki repository; start it from
 [templates/wiki-repo](templates/wiki-repo) with the wiki in `wiki/`. `capture`
 processes the pending inbox when Supabase triggers it (see the Supabase inbox

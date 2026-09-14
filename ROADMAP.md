@@ -80,10 +80,10 @@ history, and the Supabase design only stores token hashes.
 - ~~**Remove personal details.**~~ Done: a neutral skill description, and the
   wiki repository the Supabase trigger dispatches to comes from the Vault
   instead of `db/supabase.sql`.
-- **Make it installable by someone else.** The README covers the setup
-  (Supabase project, secrets, Vault, Shortcut, wiki repository template), and
-  the Shortcut ships as a signed file that asks for its settings on import
-  (`shortcut/`). Still missing: a one-command bootstrap of the wiki repository.
+- ~~**Make it installable by someone else.**~~ Done: `bin/new-wiki` creates the
+  private wiki repository, its secrets, the Supabase inbox and the local
+  settings in one command, the README opens with a quick start, and the
+  Shortcut ships as a signed file that asks for its settings on import.
 - ~~**Review before publishing.**~~ Done: secrets and personal data scan of the
   published tree, MIT license.
 
