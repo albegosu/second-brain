@@ -1,0 +1,12 @@
+data/
+# the wiki lives in its own private repository
+wiki/
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.DS_Store

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Worker on this Mac, plus the local inbox when Supabase isn't configured. Loads .env; Ctrl-C stops everything.
+# The local inbox listens on the network so the iPhone can reach it at <mac>.local:8000.
+set -e
+cd "$(dirname "$0")/.."
+set -a; . ./.env; set +a
+
+if [ -z "$SUPABASE_URL" ]; then
+  .venv/bin/uvicorn inbox.main:app --host 0.0.0.0 --port "${INBOX_PORT:-8000}" --log-level warning &
+  INBOX_PID=$!
+  trap 'kill $INBOX_PID 2>/dev/null' EXIT INT TERM
+  sleep 2
+fi
+
+.venv/bin/python -m worker.run
