@@ -1,0 +1,63 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please **remove tokens, Supabase URLs and keys, ntfy topics and private content** from anything you paste. Security issues go through [a private report](../security/advisories/new), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Capture from X
+        - Capture from Instagram
+        - Capture from LinkedIn
+        - Capture from GitHub
+        - Capture from a video site
+        - Capture from another web page
+        - Direct image or video link
+        - Wiki pages or index
+        - Lint pass
+        - Supabase inbox or trigger
+        - Shortcut
+        - Skill
+        - Setup or docs
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: runs-on
+    attributes:
+      label: Where the worker runs
+      options:
+        - GitHub Actions
+        - Locally (macOS)
+        - Locally (Linux)
+        - Not relevant
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Example URL
+      description: A public URL that reproduces it, if the problem is about a capture.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant lines of the worker or workflow log.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Engine version
+      description: Commit SHA of the engine you run (`git rev-parse --short HEAD`, or the ref your wiki repository checks out).

@@ -189,7 +189,16 @@ ln -s ~/Developer/second-brain/skill/second-brain ~/.claude/skills/second-brain
 ## The Shortcut
 
 A single one: Shortcuts is the same app on iOS and macOS and syncs over iCloud.
-On the iPhone it shows up in the share sheet; on the Mac, as a Quick Action.
+It shows up in the share sheet on the iPhone and on the Mac.
+
+**Install it:** download
+[Save to second-brain.shortcut](shortcut/Save%20to%20second-brain.shortcut) and
+open it (on a Mac it then syncs to the iPhone; on an iPhone, open it from
+Files). Shortcuts asks for three values: your Supabase project URL, its
+publishable key and your capture token. The file holds nothing personal;
+`python shortcut/build.py` generates and signs it on macOS.
+
+**To build it by hand,** or to use the local inbox instead of Supabase:
 
 1. New shortcut → ⓘ → **Show in Share Sheet**. Receive **URLs** and **Text**
    (the LinkedIn app shares text, not a URL); if there's no input, **Stop**.
@@ -268,6 +277,12 @@ screenshot, not from the rendered HTML.
 **The inbox doesn't validate URLs beyond their scheme.** The token is enough for
 personal use, but don't expose it without rate limiting if you give it a public
 domain.
+
+## Contributing
+
+Issues and pull requests are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md)
+first, and report vulnerabilities privately as [SECURITY.md](SECURITY.md)
+explains. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

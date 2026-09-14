@@ -81,9 +81,9 @@ history, and the Supabase design only stores token hashes.
   wiki repository the Supabase trigger dispatches to comes from the Vault
   instead of `db/supabase.sql`.
 - **Make it installable by someone else.** The README covers the setup
-  (Supabase project, secrets, Vault, Shortcut, wiki repository template). Still
-  missing: a shareable Shortcut and a one-command bootstrap of the wiki
-  repository.
+  (Supabase project, secrets, Vault, Shortcut, wiki repository template), and
+  the Shortcut ships as a signed file that asks for its settings on import
+  (`shortcut/`). Still missing: a one-command bootstrap of the wiki repository.
 - ~~**Review before publishing.**~~ Done: secrets and personal data scan of the
   published tree, MIT license.
 

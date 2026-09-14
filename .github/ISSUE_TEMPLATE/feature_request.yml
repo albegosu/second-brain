@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose something new or a change in behavior
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you're trying to do and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work. Mention new services or dependencies it would need.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked [ROADMAP.md](../blob/main/ROADMAP.md) and the existing issues.
+          required: true
+        - label: I'd like to implement it myself.
