@@ -67,8 +67,12 @@ def build() -> dict:
     supabase = action("gettext", WFTextActionText=text("https://<project>.supabase.co"))
     key = action("gettext", WFTextActionText=text("sb_publishable_..."))
     token = action("gettext", WFTextActionText=text("<capture token>"))
-    urls = action("detect.link", WFInput=attachment({"Type": "ExtensionInput"}))
+    # "Get URLs from" reads a text field; a bare variable there is ignored and yields no URL
+    urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
     first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    # A separate action: "Ask Each Time" inside the JSON body makes Shortcuts ask
+    # for the whole dictionary instead of the note alone.
+    note = action("ask", WFAskActionPrompt="Note (optional): what caught your eye?", WFInputType="Text")
     post = action(
         "downloadurl",
         WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
@@ -78,14 +82,14 @@ def build() -> dict:
         WFHTTPHeaders=dictionary(apikey=text(output(key, "Text"))),
         WFHTTPBodyType="JSON",
         WFJSONValues=dictionary(url=text(output(first, "Item from List")),
-                                note=text({"Type": "Ask"}),
+                                note=text(output(note, "Provided Input")),
                                 token=text(output(token, "Text"))),
     )
     status = action("getvalueforkey", WFInput=attachment(output(post, "Contents of URL")),
                     WFDictionaryKey="status", WFGetDictionaryValueType="Value")
     group = str(uuid.uuid4()).upper()
     actions = [
-        supabase, key, token, urls, first, post, status,
+        supabase, key, token, urls, first, note, post, status,
         action("conditional", GroupingIdentifier=group, WFControlFlowMode=0, WFCondition=4,
                WFConditionalActionString="queued",
                WFInput={"Type": "Variable",
