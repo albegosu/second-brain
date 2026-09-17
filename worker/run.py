@@ -136,6 +136,8 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
         # On a computer the capture stays in the local wiki and goes out with the next push.
         print(f"[worker] wiki commit failed: {e} {getattr(e, 'stderr', '') or ''}", file=sys.stderr)
     result = {"text": f"#{cid}: {entry['category']}/{entry['topic']} · {entry['title']}", "entry": entry}
+    if not reanalyze:
+        hypar.sync_index(wiki.WIKI)
     if intent == hypar.INTENT and not reanalyze:
         result.update(grow(url, vlm_note, entry))
         result["text"] += (f" · planted in hypar ({result['embryo']['id']})" if "embryo" in result
@@ -152,7 +154,9 @@ def grow(url: str, note: str | None, entry: dict) -> dict:
     if not note:
         return {"hypar_error": "no note: the seed has to be your own thought"}
     try:
-        return {"embryo": hypar.plant(note, url, hypar.source_link(wiki.WIKI, entry["source"]))}
+        _, body = wiki.read_page(wiki.WIKI / entry["source"])
+        return {"embryo": hypar.plant(note, url, hypar.source_link(wiki.WIKI, entry["source"]),
+                                      title=entry["title"], context=hypar.essence(entry.get("summary") or "", body))}
     except Exception as e:
         print(f"[worker] hypar unreachable: {e}", file=sys.stderr)
         return {"hypar_error": str(e)[:200]}
@@ -297,6 +301,7 @@ def main():
             if result.get("transient"):
                 print("[worker] stopped on a transient error (quota or network): run it again to resume")
                 return
+        hypar.sync_index(wiki.WIKI)
         return
 
     if args.once:

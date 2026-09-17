@@ -301,11 +301,19 @@ beside it.
 
 - **The seed is your note**, never the model's summary. Without a note nothing
   is planted, and the notification says so.
-- **What goes to hypar:** the note, the post URL and the source note's GitHub
-  URL. That link only opens for people who can read the wiki repository.
+- **What goes to hypar:** the note (the seed), the post URL, the source note's
+  GitHub URL (it only opens for people who can read the wiki repository) and
+  the capture's essence: its title and summary and the source note's *What it
+  shows*, *Key ideas* and *Visual style* sections, so hypar's agent knows what
+  sparked the idea. Quoted post and page text never leave the wiki.
+- **The index follows.** After every capture and lint pass the worker also
+  sends `index.md` (topic and item names with their summaries); hypar keeps the
+  latest one, for its agent to use later as contrast.
+- **Sharing again fills in** what an embryo planted earlier is missing, such as
+  the essence, without planting a second one.
 - **A failure doesn't lose the capture.** It is already filed; the notification
   says hypar couldn't be reached. Share it again later: hypar ignores a URL it
-  already has, so nothing is planted twice.
+  already has, so nothing is planted twice. A failed index push is only logged.
 - `--reanalyze` never plants.
 
 To connect it, create a token in hypar under **Settings → integrations** and add
@@ -317,8 +325,8 @@ gh secret set HYPAR_TOKEN -R <owner>/second-brain-wiki   # hyp_…
 ```
 
 A wiki repository created before this needs the two `HYPAR_*` lines of
-[templates/wiki-repo/.github/workflows/capture.yml](templates/wiki-repo/.github/workflows/capture.yml)
-in its own `capture.yml`.
+[capture.yml](templates/wiki-repo/.github/workflows/capture.yml) and
+[lint.yml](templates/wiki-repo/.github/workflows/lint.yml) in its own workflows.
 
 ## Phone notifications
 
