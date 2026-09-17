@@ -109,7 +109,10 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
     try:
         commit_wiki(f"docs(wiki): add {entry['title']}",
                     f"Capture #{cid} filed under {entry['category']}/{entry['topic']}.\n{url}")
-    except Exception as e:  # the capture is already filed: a git failure doesn't undo it
+    except Exception as e:
+        if os.environ.get("GITHUB_ACTIONS") == "true":  # not on GitHub means not filed: retry it
+            return {"text": f"#{cid} will retry: {e}", "error": str(e), "transient": True}
+        # On a computer the capture stays in the local wiki and goes out with the next push.
         print(f"[worker] wiki commit failed: {e} {getattr(e, 'stderr', '') or ''}", file=sys.stderr)
     return {"text": f"#{cid}: {entry['category']}/{entry['topic']} · {entry['title']}", "entry": entry}
 
@@ -135,10 +138,20 @@ def commit_wiki(subject: str, body: str = ""):
     )
     push = subprocess.run([*git, "push", "-q"], capture_output=True, text=True, timeout=120)
     if push.returncode:
-        subprocess.run([*git, "pull", "--rebase", "--autostash", "-q"], capture_output=True, text=True, timeout=120)
+        rebase = subprocess.run([*git, "pull", "--rebase", "--autostash", "-q"], capture_output=True, text=True, timeout=120)
+        if rebase.returncode:  # a conflict (index.md, a reused capture number) leaves a detached, half-done rebase
+            subprocess.run([*git, "rebase", "--abort"], capture_output=True, text=True)
         push = subprocess.run([*git, "push", "-q"], capture_output=True, text=True, timeout=120)
     if push.returncode:
-        print(f"[worker] push pending: {push.stderr.strip()[:200]}", file=sys.stderr)
+        reason = push.stderr.strip()[:200]
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            # The runner is thrown away and an unpushed capture with it. Go back to
+            # what's on GitHub and fail, so the item stays pending and is filed again.
+            branch = subprocess.run([*git, "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+            subprocess.run([*git, "fetch", "-q", "origin", branch], capture_output=True, text=True, timeout=120)
+            subprocess.run([*git, "reset", "-q", "--hard", f"origin/{branch}"], capture_output=True, text=True)
+            raise RuntimeError(f"push rejected, filed again on the next run: {reason}")
+        print(f"[worker] push pending: {reason}", file=sys.stderr)
 
 
 def notify(url: str, result: dict):
