@@ -43,6 +43,7 @@ INTENTS = {
     "visual style": "a visual look to reuse (a design topic whose slug starts with style-)",
     "tool to try": "a tool to try (tools)",
     "idea to read": "ideas about how to work (practices)",
+    "idea to grow": "something that sparked an idea of the user's own; file the capture where it belongs by itself",
 }
 
 # Each category's block section on a topic page, as the index labels it.

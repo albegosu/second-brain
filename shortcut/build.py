@@ -71,12 +71,12 @@ def build() -> dict:
     urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
     first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
     # One tap says what the capture is for; the worker reads it as "intent: …".
-    intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Just save"])
+    intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"])
     intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
                     WFChooseFromListActionPrompt="What caught your eye?")
     # A separate action: "Ask Each Time" inside the JSON body makes Shortcuts ask
     # for the whole dictionary instead of the note alone.
-    note = action("ask", WFAskActionPrompt="What do you want to reuse from this? (optional)", WFInputType="Text")
+    note = action("ask", WFAskActionPrompt="What do you want from this? For Idea to grow, the thought it gave you (optional)", WFInputType="Text")
     post = action(
         "downloadurl",
         WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
