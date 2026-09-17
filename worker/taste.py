@@ -28,6 +28,10 @@ PATH = "taste.md"
 # Below this many captures with a look, there is no taste to speak of.
 MIN_LOOKS = 5
 
+# Looks and motion only count from these categories: a tool's landing page or an
+# article's screenshot has a look too, but it wasn't saved for it.
+LOOK_CATEGORIES = {"design"}
+
 WRITE = """You describe the taste of the owner of a personal knowledge base of
 interface references, for an AI coding assistant that designs for them when no
 style has been given. You get counts measured by code over their captures and the
@@ -46,10 +50,13 @@ What their notes say they look for. Leave the section out if there are no notes.
 Choices the counts don't settle, so the assistant should ask or follow the project.
 
 Rules:
+- Each count line says "lead: <value>" or "no clear lead", decided by code. Only a
+  lead can be a preference; everything with no clear lead that matters for a
+  design goes under "Not enough evidence", with its top values.
 - Every bullet ends with the evidence it rests on, as counts from the input,
-  like "(grotesk 9 of 23 looks)". No count, no bullet.
-- A preference needs at least 3 captures and a clear lead over the alternatives;
-  otherwise it goes under "Not enough evidence".
+  like "(grotesk 9 of 23)". No count, no bullet.
+- Recurring subjects are specific components, layouts and kinds of motion, never
+  the categories themselves.
 - Only what the counts and notes support: no fonts, hex codes, durations or
   frameworks that aren't in the input.
 - Direct and short: a builder reads it in half a minute.
@@ -108,6 +115,8 @@ def evidence() -> dict:
         if note:
             notes.append((meta.get("title", f.stem), rel, note))
 
+        if str(meta.get("topic", "")).split("/")[0] not in LOOK_CATEGORIES:
+            continue
         if m := re.search(r"^Traits: (.+)$", body, re.M):
             looks += 1
             for key, value in traits(m.group(1)).items():
@@ -138,7 +147,19 @@ def evidence() -> dict:
     return {"captures": captures, "looks": looks, "counts": c, "notes": notes}
 
 
-def evidence_lines(ev: dict) -> list[str]:
+def lead(counts: Counter) -> str | None:
+    """The value that clearly leads: at least 3 captures, a third of the total and
+    half again as many as the runner-up."""
+    counts = Counter({v: n for v, n in counts.items() if v not in ("other", "none")})  # not a choice
+    top = counts.most_common(2)
+    if not top:
+        return None
+    total, (value, n) = sum(counts.values()), top[0]
+    runner = top[1][1] if len(top) > 1 else 0
+    return value if n >= 3 and 3 * n >= total and 2 * n >= 3 * runner else None
+
+
+def evidence_lines(ev: dict, verdict: bool = False) -> list[str]:
     labels = [("category", "Categories"), ("typography", "Typography"), ("radius", "Radius"),
               ("spacing", "Spacing"), ("depth", "Depth"), ("motion_feel", "Motion feel"),
               ("background", "Background tone"), ("accent", "Accent hues"), ("color", "Color"),
@@ -147,12 +168,16 @@ def evidence_lines(ev: dict) -> list[str]:
     lines = []
     for key, label in labels:
         if counts := ev["counts"][key].most_common(8):
-            lines.append(f"- **{label}:** " + " · ".join(f"{v} {n}" for v, n in counts))
+            line = f"- **{label}:** " + " · ".join(f"{v} {n}" for v, n in counts)
+            if verdict and key != "category":
+                line += f" (of {sum(ev['counts'][key].values())}; " + (
+                    f"lead: {v})" if (v := lead(ev["counts"][key])) else "no clear lead)")
+            lines.append(line)
     return lines
 
 
 def write(ev: dict) -> str:
-    counts = "\n".join(evidence_lines(ev))
+    counts = "\n".join(evidence_lines(ev, verdict=True))
     notes = "\n".join(f"- {title}: {note}" for title, _, note in ev["notes"]) or "(none)"
     prompt = (f"{ev['captures']} captures, {ev['looks']} with a measured look.\n\n"
               f"Counts:\n{counts}\n\nOwner's notes:\n{notes}")
@@ -169,7 +194,7 @@ def build(dry_run: bool = False) -> bool:
     ev = evidence()
     if dry_run:
         print(f"{ev['captures']} captures, {ev['looks']} looks, {len(ev['notes'])} notes")
-        print("\n".join(evidence_lines(ev)))
+        print("\n".join(evidence_lines(ev, verdict=True)))
         return False
     if ev["looks"] < MIN_LOOKS:
         print(f"[taste] only {ev['looks']} captures with a look: no profile yet")
@@ -177,9 +202,10 @@ def build(dry_run: bool = False) -> bool:
 
     lines = ["What these captures have in common, as a starting point when there is no style",
              "given. The project's own design system and an explicit request always win.",
-             "The evidence is counted by code; the direction above it is a model's reading",
+             "The evidence at the end is counted by code; the direction is a model's reading",
              "of that evidence.", "", write(ev), "", "## Evidence", "",
-             f"{ev['captures']} captures, {ev['looks']} with a measured look. Counts are per capture.", "",
+             f"{ev['captures']} captures, {ev['looks']} design captures with a measured look. Looks and motion "
+             "count design captures only, once per capture.", "",
              *evidence_lines(ev), ""]
     if ev["notes"]:
         lines += ["## Your notes", ""]
