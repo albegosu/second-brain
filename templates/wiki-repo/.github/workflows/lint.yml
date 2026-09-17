@@ -61,6 +61,8 @@ jobs:
           BRAIN_VLM: gemma4:31b
           BRAIN_WIKI: ${{ github.workspace }}/wiki
           BRAIN_GIT_SYNC: "1"
+          HYPAR_URL: ${{ secrets.HYPAR_URL }}      # optional: keep hypar's copy of the index current
+          HYPAR_TOKEN: ${{ secrets.HYPAR_TOKEN }}
           RECOMPOSE_ALL: ${{ inputs.recompose_all && '--recompose-all' || '' }}
           NO_PLAN: ${{ inputs.no_plan && '--no-plan' || '' }}
         run: |

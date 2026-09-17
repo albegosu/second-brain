@@ -72,8 +72,12 @@ every credential, so the deployed hypar never reads the private wiki.
 - ~~**Idea to grow.**~~ Done: a Shortcut intent that plants the note as a latent
   embryo through a per-user hypar token, with the original and the source note
   beside it.
-- **References as contrast.** After each capture, send `index.md` (topic and
-  pattern names, no quoted posts) so hypar's agent can press on a growing idea
+- ~~**What sparked the idea.**~~ Done: a planted embryo carries the capture's
+  essence (title, summary, what it shows, key ideas, visual style), so hypar's
+  agent knows what "this" is.
+- **References as contrast.** Phase 1 done: `index.md` (topic and pattern names,
+  no quoted posts) reaches hypar after each capture and lint pass. Next, hypar's
+  agent uses it to press on a growing idea
   with what you already saved. Only while probing and opening paths, never when
   the problem is still being defined. An experiment in hypar first.
 - **Fossils as practices.** Pull hypar's fossils and mature embryos into the

@@ -18,6 +18,7 @@ import re
 import sys
 from datetime import date
 
+from . import hypar
 from . import pipeline as p
 from . import run
 from . import taste
@@ -239,6 +240,7 @@ def main():
         run.commit_wiki("docs(wiki): lint pass",
                         "\n".join([*log, *(f"rewrote {k}" for k in rewritten), *(f"note: {n}" for n in notes),
                                     *(["refreshed taste profile"] if refreshed else [])]))
+        hypar.sync_index(wiki.WIKI)
 
 
 if __name__ == "__main__":
