@@ -44,6 +44,13 @@ is rough priority.
 - ~~**Ideas from what you read.**~~ Done: a `practices` category; articles and
   long texts get their key ideas extracted, and topic pages list them with claim,
   why and how to apply.
+- ~~**See the reference.**~~ Done: each visual capture keeps a small contact sheet
+  (up to four frames in time order, or the image) next to its note, and the skill
+  tells Claude to look at it before building.
+- ~~**Taste profile.**~~ Done: `worker/taste.py`, after each lint pass. Counts by
+  code, a default look and motion written from them.
+- ~~**Usage log.**~~ Done: `worker/used.py` records which captures shaped a build;
+  the index shows uses per topic.
 - **Topic hierarchy.** When a category grows, group topics into clusters and
   subtopics so the index stays scannable in one read.
   *Inspired by ContextBolt's topic clusters.*

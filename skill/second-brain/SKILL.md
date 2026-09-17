@@ -15,7 +15,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 
 ## How to use it
 
-1. Read `wiki/index.md` first. For every topic it lists a one-line summary and the blocks the page holds (patterns, styles, options or ideas), plus the latest captures. Match on block names, not only topic titles. Don't read whole folders.
+1. Read `wiki/index.md` first. For every topic it lists a one-line summary, the blocks the page holds (patterns, styles, options or ideas) and how often it was used in a build, plus the latest captures. Match on block names, not only topic titles. Don't read whole folders.
 2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed, one `### <name> [n]` block per item:
    - `## Patterns` (design, features): **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
    - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. Apply it like a DESIGN.md.
@@ -25,6 +25,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
    - `## See also`: related topics of the same category worth opening when the task spans them. A relevant tool page won't be linked from a design page, so check the index's tools section too.
    - `## Sources`: citations like `[2]` point here.
 3. Open a source note (`wiki/sources/…`) only when you need the specifics: the user's note, the measured palette, the original post text or the link to the video.
+   - Visual captures keep a `.jpg` next to their note (linked as `frames` in the topic's sources list): up to four frames in time order, left to right and top to bottom, or the image itself. Before building a look, a layout or an interaction from the wiki, open that image with the Read tool and look at it. The text describes the reference; the image is the reference.
 4. If the index doesn't obviously cover it, search. Everything is in English:
    ```bash
    rg -i "<keyword>" ~/Developer/second-brain-wiki/wiki
@@ -33,9 +34,14 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 
 ## When building from it
 
+- Designing something with no style given, neither by the user nor by the project's design system? Read `wiki/taste.md` first and start from its default look and motion. Each line there cites the counts it rests on; treat "Not enough evidence" as questions to ask. An explicit request or the project's own tokens always win over it.
 - Steps, animated properties and easing come from a vision model looking at frames. They are good starting points. Durations are usually omitted on purpose, because they cannot be measured from stills.
 - Palettes in source notes are measured from pixels but include the demo's content colors. Pick the UI ones.
 - Adapt to the project's own design tokens and stack. The wiki never stores code.
+- When something you built actually takes from captures (not when you only looked), record it once, at the end, with their capture numbers (the `0007` in `sources/2026-09/0007-….md`). It shows the user which saves turn out useful:
+  ```bash
+  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.used 7 21 --project "<repository or product>" --what "<what was taken, in one line>"
+  ```
 
 ## Adding to it
 
@@ -47,5 +53,5 @@ cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRA
 
 - Put `style: <name>` in the note to file the capture under the design topic `style-<name>`.
 - Topic pages are rewritten from their source notes whenever a capture arrives or the weekly lint pass reorganizes topics, so manual edits to a topic page don't last. Put lasting context in the capture's note instead.
-- `wiki/index.md` is regenerated every time, so never edit it by hand.
+- `wiki/index.md`, `wiki/taste.md` and `wiki/usage.md` are written by code, so never edit them by hand.
 - Don't commit wiki changes: the worker commits and pushes them to the wiki repository. Engine code changes (`~/Developer/second-brain` by default) are the user's to commit.

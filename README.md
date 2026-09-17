@@ -61,9 +61,12 @@ repository are public and print what was captured. Point `BRAIN_WIKI` at its
 ```
 wiki/
   index.md                      map of topics; written by code
+  taste.md                      recurring choices across captures; weekly
+  usage.md                      what was built from which captures
   design/ features/ tools/      one page per topic
   practices/
   sources/2026-09/0007-….md     one note per capture
+  sources/2026-09/0007-….jpg    what it looked like: up to 4 frames in time order
 ```
 
 - **Categories:**
@@ -95,7 +98,10 @@ wiki/
   folder to the repository that holds it after each capture. The commits are
   unsigned (it runs without a terminal for the GPG passphrase) and never touch
   anything outside that folder; code commits are yours.
-- **Videos and frames:** stay in `data/`, out of git.
+- **Videos and frames:** the downloads stay in `data/`, out of git. The wiki keeps
+  one small jpg per visual capture next to its note (up to four frames spread
+  across the video, or the image), so an agent can look at the reference and not
+  only read about it.
 
 A note with `style: name` (or `estilo: name`) files the capture under
 `design/style-name`, to collect a look across several captures.
@@ -125,6 +131,18 @@ python -m worker.lint                  # apply it
 python -m worker.lint --recompose-all  # also rewrite every page from its sources
 python -m worker.lint --no-plan        # skip the model's plan, only apply the rules
 ```
+
+**Taste profile.** After the lint pass, `wiki/taste.md` is rewritten: the code
+counts style traits, facets, animated properties, easing, background tone and
+accent hues across every capture, and the model turns those counts and your
+notes into a short default look and motion, each line citing its counts. The
+skill starts from it when nothing else sets a style. `python -m worker.taste
+--dry-run` prints the counts.
+
+**Usage log.** When Claude builds something that takes from the wiki, the skill
+records it with `python -m worker.used <capture numbers> --project … --what …`.
+Lines go to `wiki/usage.md` by capture number, and the index shows how often each
+topic was used, so what proves useful stands out from what was only saved.
 
 ## What it understands
 

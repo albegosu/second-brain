@@ -119,7 +119,7 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
             key_ideas = p.ideas(text, vlm_note)
         entry = wiki.file_capture(cid=cid, captured=captured, url=url, source=source, media=media,
                                   note=note, patterns=patterns, style=look, style_name=style,
-                                  ideas=key_ideas, intent=intent)
+                                  ideas=key_ideas, intent=intent, frames=frames)
     except Exception as e:
         transient = is_transient(e)
         return {"text": f"#{cid} {'will retry' if transient else 'failed'}: {e}",

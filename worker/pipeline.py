@@ -566,6 +566,52 @@ def keyframes(video: Path, cid: int, limit: int = 12) -> list[Path]:
     return sorted(out.glob("*.jpg"))
 
 
+def contact_sheet(frames: list[Path], dst: Path, cells: int = 4, width: int = 960) -> Path | None:
+    """Up to `cells` frames spread across the capture as one small jpg, in time
+    order from left to right and top to bottom. The wiki keeps it next to the
+    source note, so an agent can look at the reference and not only read about it.
+    None when there are no frames or ffmpeg can't read them."""
+    frames = [f for f in frames if f and Path(f).exists()]
+    if not frames:
+        return None
+    n = min(cells, len(frames))
+    picks = [frames[round(i * (len(frames) - 1) / (n - 1))] for i in range(n)] if n > 1 else frames[:1]
+
+    size = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+         "-of", "csv=p=0:s=x", str(picks[0])],
+        capture_output=True, text=True,
+    ).stdout.strip().split("x")
+    try:
+        aspect = int(size[1]) / int(size[0])
+    except (IndexError, ValueError, ZeroDivisionError):
+        aspect = 0.625
+    cw = width if n == 1 else width // 2
+    ch = int(cw * min(max(aspect, 0.4), 2.2)) // 2 * 2  # phone videos are tall; banners wide
+
+    cell = f"scale={cw}:{ch}:force_original_aspect_ratio=decrease,pad={cw}:{ch}:(ow-iw)/2:(oh-ih)/2:color=0x1e1e1e,setsar=1"
+    graph = ";".join(f"[{i}:v]{cell}[c{i}]" for i in range(n))
+    inputs = "".join(f"[c{i}]" for i in range(n))
+    if n == 1:
+        graph += ";[c0]null[out]"
+    elif n == 2:
+        graph += f";{inputs}hstack=inputs=2[out]"
+    else:
+        layout = "|".join(["0_0", "w0_0", "0_h0", "w0_h0"][:n])
+        graph += f";{inputs}xstack=inputs={n}:layout={layout}:fill=0x1e1e1e[out]"
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    done = subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", *[a for f in picks for a in ("-i", str(f))],
+         "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "5", str(dst)],
+        capture_output=True, text=True,
+    )
+    if done.returncode or not dst.exists():
+        print(f"[pipeline] no contact sheet: {done.stderr.strip()[:200]}", file=sys.stderr)
+        return None
+    return dst
+
+
 def palette(frames: list[Path], width: int = 96) -> list[dict]:
     """Colors measured from pixels, not estimated: a VLM makes up hex codes.
     Neutrals and accents are kept apart, because a brand color often covers
