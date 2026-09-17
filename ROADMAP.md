@@ -67,7 +67,10 @@ is rough priority.
 
 [hypar](https://github.com/albegosu/hypar) grows your own ideas; second-brain
 keeps what others made. The bridge runs from the wiki repository, which holds
-every credential, so the deployed hypar never reads the private wiki.
+every credential, so the deployed hypar never reads the private wiki. The two
+projects are developed apart; only what the bridge needs is synchronized, in the
+[Lab roadmap](https://github.com/users/albegosu/projects/5) cards titled
+`Loop — …`.
 
 - ~~**Idea to grow.**~~ Done: a Shortcut intent that plants the note as a latent
   embryo through a per-user hypar token, with the original and the source note
