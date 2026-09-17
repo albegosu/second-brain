@@ -60,7 +60,8 @@ Rules:
 - A topic is a subject many captures can share, named in kebab-case and specific
   ("expand-collapse-disclosure", "hover-reveals", "tab-transitions"). Titles are
   short Title Case; summaries are one line.
-- Categories: design, features or tools only.
+- Categories: design, features, tools or practices only. Topics that collect a
+  visual look keep a slug starting with "style-".
 """.replace("__CATEGORIES__", "\n".join(f"- {k}: {v}" for k, v in wiki.CATEGORIES.items()))
 
 

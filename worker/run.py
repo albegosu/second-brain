@@ -50,17 +50,28 @@ GIT_SYNC = os.environ.get("BRAIN_GIT_SYNC") == "1"
 MAX_ATTEMPTS = 5
 
 STYLE_TAG = re.compile(r"\b(?:style|estilo):\s*([a-z0-9][a-z0-9-]*)", re.I)
+INTENT_TAG = re.compile(r"\bintent:\s*(pattern to reuse|visual style|tool to try|idea to read|just save)[\s—–:-]*", re.I)
+# Below this many words, with no image, video or note, there's nothing to file:
+# the model would have to make the capture up.
+MIN_WORDS = 25
+# Text past this many words (an article, a long thread) also gets its ideas extracted.
+IDEA_WORDS = 150
 TRANSIENT = re.compile(r"\b(408|425|429|50[0-4])\b|timed? ?out|No route to host|"
                        r"Connection (reset|refused|aborted)|Temporary failure|Name or service not known",
                        re.I)
 
 
-def parse_note(note: str | None) -> tuple[str | None, str | None]:
-    """'style: name' in the note picks the topic; the rest goes to the model."""
-    if not note or not (m := STYLE_TAG.search(note)):
-        return None, note
-    rest = (note[:m.start()] + note[m.end():]).strip(" \n,;.") or None
-    return m.group(1).lower(), rest
+def parse_note(note: str | None) -> tuple[str | None, str | None, str | None]:
+    """What a note says besides free text: "style: name" picks the topic and
+    "intent: …" (the Shortcut's menu) hints the category. The rest goes to the
+    model as the user's note."""
+    style = intent = None
+    rest = note or ""
+    if m := STYLE_TAG.search(rest):
+        style, rest = m.group(1).lower(), rest[:m.start()] + rest[m.end():]
+    if m := INTENT_TAG.search(rest):
+        intent, rest = m.group(1).lower(), rest[:m.start()] + rest[m.end():]
+    return style, intent, rest.strip(" \n,;.—–-") or None
 
 
 def is_transient(e: Exception) -> bool:
@@ -82,7 +93,7 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
     existing = wiki.find_source(url)
     if existing and note is None:
         note = existing[1].get("note")  # re-analysis without --note keeps the note
-    style, vlm_note = parse_note(note)
+    style, intent, vlm_note = parse_note(note)
 
     # Already filed: nothing to do, unless the note carries a style.
     if existing and not reanalyze and not style:
@@ -96,11 +107,19 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
             frames = p.keyframes(media["path"], cid)
         else:
             frames = [media["path"], *media.get("extra", [])] if media["kind"] == "image" else []
+        words = p.readable_words(media)
+        if not frames and not vlm_note and words < MIN_WORDS:
+            raise RuntimeError("Nothing to read: share it again with a note")
         analysis = p.analyze(frames, vlm_note, media.get("text")) if frames else {}
         patterns = p.clean_patterns(analysis.get("patterns") or [])
         look = p.clean_style(analysis.get("style"), frames) if frames else None
+        key_ideas = []
+        if media.get("article") or (not patterns and words >= IDEA_WORDS):
+            text = "\n\n".join(x for x in (media.get("text"), (media.get("page") or {}).get("excerpt")) if x)
+            key_ideas = p.ideas(text, vlm_note)
         entry = wiki.file_capture(cid=cid, captured=captured, url=url, source=source, media=media,
-                                  note=note, patterns=patterns, style=look, style_name=style)
+                                  note=note, patterns=patterns, style=look, style_name=style,
+                                  ideas=key_ideas, intent=intent)
     except Exception as e:
         transient = is_transient(e)
         return {"text": f"#{cid} {'will retry' if transient else 'failed'}: {e}",
@@ -231,7 +250,8 @@ def main():
     ap.add_argument("--url")
     ap.add_argument("--note")
     ap.add_argument("--reanalyze", action="store_true",
-                    help="analyze again even if already filed (without --url: the whole wiki)")
+                    help="analyze again even if already filed (without --url: every note the current "
+                         "pipeline hasn't analyzed yet, so an interrupted run resumes)")
     args = ap.parse_args()
 
     if args.url:
@@ -239,8 +259,17 @@ def main():
         return
 
     if args.reanalyze:
-        for meta in [wiki.read_page(f)[0] for f in wiki.source_files()]:
-            print(f"[worker] {meta['url']}\n         {ingest(meta['url'], meta.get('note'), reanalyze=True)['text']}")
+        for f in wiki.source_files():
+            if not f.exists():  # renamed by an earlier re-analysis in this run
+                continue
+            meta = wiki.read_page(f)[0]
+            if int(meta.get("analyzed") or 1) >= wiki.ANALYZED:
+                continue
+            result = ingest(meta["url"], meta.get("note"), reanalyze=True)
+            print(f"[worker] {meta['url']}\n         {result['text']}")
+            if result.get("transient"):
+                print("[worker] stopped on a transient error (quota or network): run it again to resume")
+                return
         return
 
     if args.once:

@@ -156,9 +156,16 @@ def canonical_url(url: str) -> str:
 
 # ---------------------------------------------------------------- ingestion
 
+X_URL = re.compile(r"https?://(?:www\.)?(?:x|twitter)\.com/", re.I)
+
+
 def fetch_x(url: str, cid: int) -> dict | None:
     """X serves video as chunked HLS behind a blob: URL. fxtwitter normalizes it
-    into a direct mp4 with no API key. Returns None when it doesn't apply."""
+    into a direct mp4 with no API key, and it also returns what a post only links
+    to: the text of an X Article and the media of a quoted post. A post with none
+    of that but an outside link is read through the linked page. Without this the
+    model got a bare link and made the capture up. Returns None when it doesn't
+    apply."""
     m = re.search(r"status/(\d+)", url)
     if not m:
         return None
@@ -168,16 +175,39 @@ def fetch_x(url: str, cid: int) -> dict | None:
         return None
     tweet = r.json().get("tweet") or {}
     author = (tweet.get("author") or {}).get("screen_name")
+    text = (tweet.get("text") or "").strip()
+
+    if article := tweet.get("article"):  # the cover is decoration: the text is the capture
+        blocks = (article.get("content") or {}).get("blocks") or []
+        body = "\n\n".join(str(b.get("text")).strip() for b in blocks if isinstance(b, dict) and str(b.get("text") or "").strip())
+        return {"path": None, "kind": "text", "article": True, "author": author,
+                "text": "\n\n".join(x for x in (article.get("title"), article.get("preview_text")) if x),
+                "page": {"title": article.get("title"), "description": article.get("preview_text"),
+                         "excerpt": body or article.get("preview_text") or ""}}
+
     media = (tweet.get("media") or {}).get("all") or []
-    if not media:  # text-only post (e.g. recommending a tool)
-        return {"path": None, "kind": "text", "author": author, "text": tweet.get("text")}
+    quote = tweet.get("quote") or {}
+    if not media and quote:
+        media = (quote.get("media") or {}).get("all") or []
+        quoted = (quote.get("author") or {}).get("screen_name")
+        text = f"{text}\n\nQuoting @{quoted}: {(quote.get('text') or '').strip()}".strip()
+    if media:
+        item = media[0]
+        kind = "video" if item["type"] in ("video", "gif") else "image"
+        path = MEDIA / f"{cid}.{'mp4' if kind == 'video' else 'jpg'}"
+        path.write_bytes(httpx.get(item["url"], follow_redirects=True, timeout=120).content)
+        return {"path": path, "kind": kind, "author": author, "text": text}
 
-    item = media[0]
-    kind = "video" if item["type"] in ("video", "gif") else "image"
-    path = MEDIA / f"{cid}.{'mp4' if kind == 'video' else 'jpg'}"
-    path.write_bytes(httpx.get(item["url"], follow_redirects=True, timeout=120).content)
-
-    return {"path": path, "kind": kind, "author": author, "text": tweet.get("text")}
+    for link in re.findall(r"https?://[^\s<>\"')]+", text):
+        if X_URL.match(link):
+            continue
+        try:
+            linked = canonical_url(link)
+            return {**fetch_media(linked, detect_source(linked), cid), "author": author, "text": text}
+        except Exception as e:
+            print(f"[pipeline] linked page dropped: {e}", file=sys.stderr)
+        break
+    return {"path": None, "kind": "text", "author": author, "text": text}
 
 
 def fetch_ytdlp(url: str, cid: int) -> dict:
@@ -604,6 +634,43 @@ def parse_json(raw: str):
         return json.loads(unfence(raw))
     except json.JSONDecodeError as e:
         raise RuntimeError(f"the model did not return JSON: {raw[:300]}") from e
+
+
+IDEAS = """You extract the ideas worth keeping from a text a user saved: an article,
+a thread or a page, usually about how to work (engineering practices, workflows
+with AI agents, learning, product thinking).
+
+Return ONLY JSON:
+{"ideas": [{"title": "short, specific name of the idea",
+            "claim": "the idea itself, in one or two sentences",
+            "why": "the reasoning or evidence the text gives for it",
+            "apply": "how to put it into practice, as concretely as the text allows"}]}
+
+Rules:
+- Only ideas the text states. No outside knowledge, no generic advice.
+- Up to 8 ideas, the most useful first; fewer if the text has fewer.
+- If the text isn't about ideas or practices (a product launch, an ad for a
+  course or service, a list of tools, a UI demo, a caption), return {"ideas": []}.
+- English, whatever the language of the text. Leave a field empty rather than guess.
+"""
+
+
+def ideas(text: str, note: str | None = None) -> list[dict]:
+    """The ideas of an article or a long text, for practices topics."""
+    prompt = ([f"User's note (why they saved it): {note}"] if note else []) + [f"Text:\n{text[:24000]}"]
+    data = parse_json(chat(IDEAS, "\n\n".join(prompt), as_json=True, num_ctx=32768))
+    items = data.get("ideas") if isinstance(data, dict) else data
+    return [i for i in items or [] if isinstance(i, dict) and i.get("title") and i.get("claim")]
+
+
+def readable_words(media: dict) -> int:
+    """Words there are to read in a capture, links left out. A post whose text is
+    the page's title and description (Instagram) doesn't count them twice."""
+    page = media.get("page") or {}
+    text = str(media.get("text") or "")
+    parts = [text, page.get("excerpt")] + [x for x in (page.get("title"), page.get("description"))
+                                           if x and str(x) not in text]
+    return len(re.sub(r"https?://\S+", " ", " ".join(str(x or "") for x in parts)).split())
 
 
 def analyze(frames: list[Path], note: str | None, post_text: str | None = None) -> dict:

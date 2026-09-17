@@ -27,7 +27,23 @@ CATEGORIES = {
     "design": "UI patterns, interactions, motion and visual styles",
     "features": "Product functionality and behaviours worth building",
     "tools": "Tools, libraries and services",
+    "practices": "How to work: engineering practices, agent workflows and lessons from articles",
 }
+
+# Version of the analysis a source note was written with. `run --reanalyze`
+# without a URL only redoes notes below it, so an interrupted run resumes.
+ANALYZED = 2
+
+# What the Shortcut's intent menu tells the classifier.
+INTENTS = {
+    "pattern to reuse": "a UI pattern or a product feature to reuse (design or features)",
+    "visual style": "a visual look to reuse (a design topic whose slug starts with style-)",
+    "tool to try": "a tool to try (tools)",
+    "idea to read": "ideas about how to work (practices)",
+}
+
+# Each category's block section on a topic page, as the index labels it.
+SECTIONS = ("Patterns", "Options", "Ideas", "Styles")
 
 # Characters of source notes a topic page is written from. Past this, each note
 # is trimmed evenly (the head of a note holds what matters most).
@@ -37,7 +53,7 @@ CLASSIFY = """You file captures into a personal knowledge base. Categories:
 __CATEGORIES__
 
 Return ONLY JSON:
-{"category": "design | features | tools",
+{"category": "design | features | tools | practices",
  "topic": "slug of an existing topic, or a new kebab-case slug",
  "topic_title": "short Title Case name for the topic",
  "topic_summary": "one line: what the topic covers",
@@ -46,6 +62,9 @@ Return ONLY JSON:
  "tags": ["3-6 lowercase keywords"]}
 
 Rules:
+- Title, summary, category and topic come only from what the capture contains:
+  what the vision model saw, the post or page text, its key ideas and the user's
+  note. Never guess what a link or a short caption is about.
 - Reuse an existing topic whenever the capture is about the same subject. Create a
   new topic only for a genuinely different subject.
 - A topic is a subject many captures can share ("expand-collapse-disclosure",
@@ -53,6 +72,18 @@ Rules:
   ("jakub-demo"), and never a catch-all ("micro-interactions", "ui-patterns").
 - design = how an interface looks and moves. features = what a product does for its
   user. tools = something you use to build (app, library, service, generator).
+  practices = how to work: engineering practices, workflows with AI agents,
+  learning, product thinking; usually an article or a thread with key ideas.
+- A capture that is only a look (a design shot, poster, moodboard or composition,
+  with no product, tool, interaction or feature behind it) goes to a design topic
+  for that family of looks, with a slug starting with "style-"
+  ("style-dark-high-contrast", "style-editorial-serif"). Reuse an existing style-
+  topic when the look matches.
+- The website, repository, launch, demo or announcement of a tool, library,
+  product or AI model is filed by what it is (tools, or features), never as a
+  style, even when only its look was analyzed.
+- The user's intent, when given, says what they want from the capture: follow it
+  unless the capture clearly contradicts it.
 - Write in English, whatever the language of the capture.
 """.replace("__CATEGORIES__", "\n".join(f"- {k}: {v}" for k, v in CATEGORIES.items()))
 
@@ -71,17 +102,31 @@ Structure:
   which order, end state.
   **Motion:** animated properties · easing (leave the line out if nothing moves).
   **Watch out:** trade-offs or pitfalls the sources state or clearly imply.
+- Topics marked "Kind: visual style" (instead of Patterns): a "## Styles" section
+  with one "### <Style name> [n]" block per distinct look. Captures that share a
+  look are ONE block citing all of them. Inside each block:
+  **Tokens:** the measured palette colors that belong to the interface (hex codes
+  from the notes), type family, radius, spacing, depth and motion feel from the
+  notes' traits.
+  **Composition:** layout, hierarchy and contrast.
+  **Do:** and **Don't:** what the look depends on and what would break it.
+  **Use it for:** one line.
 - tools topics: an "## Options" section with one "### <Tool name> [n]" block per
-  tool: **What it does:**, **Use it when:**, **Notes:** (limits, platform, pricing,
-  only as stated).
-- With two or more patterns or options: a "## Choosing" section, a few bullets on
-  which one fits which situation.
-- "## Visual style" only when the topic itself is a visual style.
+  tool: **What it does:**, **Use it when:**, **Link:** (only a URL from that
+  source's "Links", never one you make up), **Notes:** (limits, platform, pricing,
+  only as stated). Tools a source describes in exactly the same words share one
+  block headed with all their names ("### TypeUI · DesignMD [2]").
+- practices topics: an "## Ideas" section with one "### <Idea name> [n]" block per
+  idea: **Claim:**, **Why it matters:**, **How to apply:**, **Watch out:**.
+- With two or more patterns, styles, options or ideas: a "## Choosing" section, a
+  few bullets on which one fits which situation.
 
 Rules:
 - Nothing gets dropped: every "### " entry under a source note's "What it shows"
-  (what the vision model actually saw) gets its own block, even if it only loosely
-  fits the topic. For tools topics, every tool the notes describe gets a block.
+  (what the vision model actually saw) or "Key ideas" gets its own block, even if
+  it only loosely fits the topic. For tools topics, every tool the notes describe
+  gets a block.
+- Leave out a field that has nothing to say; never write "None" or "Not stated".
 - Ideas that only appear in a post's text or a page excerpt, not under "What it
   shows" (tip lists, generic advice), don't get blocks: list them briefly under a
   final "## Also mentioned" section, one bullet each with its [n].
@@ -144,7 +189,7 @@ def topics() -> list[dict]:
         out.append({"key": topic_key(f), "category": f.parent.name, "slug": f.stem,
                     "title": meta.get("title", f.stem), "summary": meta.get("summary", ""),
                     "sources": meta.get("sources", []), "related": meta.get("related", []),
-                    "patterns": pattern_names(body)})
+                    "patterns": pattern_names(body), "label": section_label(body)})
     return out
 
 
@@ -177,14 +222,20 @@ def strip_generated(body: str) -> str:
 
 
 def pattern_names(body: str) -> list[str]:
-    """The ### blocks under "## Patterns" or "## Options", without citations."""
+    """The ### blocks under "## Patterns", "## Options", "## Ideas" or "## Styles",
+    without citations."""
     names, section = [], None
     for line in body.splitlines():
         if line.startswith("## "):
             section = line[3:].strip()
-        elif line.startswith("### ") and section in ("Patterns", "Options"):
+        elif line.startswith("### ") and section in SECTIONS:
             names.append(re.sub(r"\s*\[\d+(?:\s*,\s*\d+)*\]", "", line[4:]).strip())
     return names
+
+
+def section_label(body: str) -> str:
+    """The block section a topic page uses, for the index."""
+    return next((s for s in SECTIONS if re.search(rf"^## {s}\s*$", body, re.M)), "Patterns")
 
 
 def write_topic(path: Path, meta: dict, body: str):
@@ -244,8 +295,7 @@ def build_index():
             n = len(t["sources"])
             lines.append(f"- [{t['title']}]({t['key']}.md) — {t['summary']} ({n} source{'' if n == 1 else 's'})")
             if t["patterns"]:
-                label = "Options" if cat == "tools" else "Patterns"
-                lines.append(f"  {label}: {' · '.join(t['patterns'])}")
+                lines.append(f"  {t['label']}: {' · '.join(t['patterns'])}")
         if not mine:
             lines.append("_Nothing yet._")
         lines.append("")
@@ -274,9 +324,10 @@ def _quote(text: str, limit: int = 1500) -> str:
     return "\n".join(f"> {line}" if line.strip() else ">" for line in text.splitlines())
 
 
-def source_body(*, note, text, page, patterns, style) -> str:
+def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False) -> str:
     """Everything known about the capture. It is both the classifier's input and
-    the body of the note, so it doesn't depend on the model that writes the wiki."""
+    the body of the note, so it doesn't depend on the model that writes the wiki.
+    long_text keeps more of the page (an article is the capture itself)."""
     out = []
     if note:
         out += ["## Note", "", _quote(note), ""]
@@ -298,6 +349,14 @@ def source_body(*, note, text, page, patterns, style) -> str:
             if facets:
                 out += [f"Facets: {facets}", ""]
 
+    kept = [i for i in ideas if isinstance(i, dict) and i.get("title") and i.get("claim")]
+    if kept:
+        out += ["## Key ideas", ""]
+        for idea in kept:
+            out += [f"### {idea['title']}", "", str(idea["claim"]), ""]
+            out += [f"{label}: {idea[key]}" for key, label in (("why", "Why"), ("apply", "Apply")) if idea.get(key)]
+            out.append("")
+
     if style and (style.get("description") or style.get("palette")):
         out += ["## Visual style", ""]
         if traits := " · ".join(style[k] for k in p.STYLE if style.get(k)):
@@ -309,6 +368,11 @@ def source_body(*, note, text, page, patterns, style) -> str:
                                for c in style["palette"])
             out += [f"Palette, measured from pixels (includes content colors): {colors}", ""]
 
+    # The post's own words, unless they only repeat the page's title and description
+    # (a post that links to a page keeps both).
+    derived = "\n\n".join(x for x in ((page or {}).get("title"), (page or {}).get("description")) if x)
+    if text and text.strip() not in derived:
+        out += ["## Post text", "", _quote(text), ""]
     if page:
         out += ["## Page", ""]
         if page.get("title"):
@@ -316,15 +380,14 @@ def source_body(*, note, text, page, patterns, style) -> str:
         if page.get("description"):
             out += [page["description"], ""]
         if page.get("excerpt"):
-            out += [_quote(page["excerpt"], 1200), ""]
-    elif text:
-        out += ["## Post text", "", _quote(text), ""]
+            out += [_quote(page["excerpt"], 6000 if long_text else 1200), ""]
     return "\n".join(out).strip()
 
 
-def classify(header: str, body: str, known: list[dict]) -> dict:
+def classify(header: str, body: str, known: list[dict], intent: str | None = None) -> dict:
     listing = "\n".join(f"- {t['key']}: {t['title']} — {t['summary']}" for t in known) or "(none yet)"
-    data = p.parse_json(p.chat(CLASSIFY, f"Existing topics:\n{listing}\n\nCapture:\n{header}\n\n{body}",
+    hint = f"User's intent: {INTENTS[intent]}\n\n" if intent in INTENTS else ""
+    data = p.parse_json(p.chat(CLASSIFY, f"Existing topics:\n{listing}\n\n{hint}Capture:\n{header}\n\n{body}",
                                as_json=True))
     if isinstance(data, list) and data and isinstance(data[0], dict):  # sometimes wrapped in [ ]
         data = data[0]
@@ -333,20 +396,44 @@ def classify(header: str, body: str, known: list[dict]) -> dict:
     return data
 
 
+URL = re.compile(r"https?://[^\s<>\"'`)\]]+")
+# Where a post lives, not what it points to: no use as a tool's link.
+POST_HOSTS = re.compile(r"https?://(?:[\w-]+\.)*(?:x\.com|twitter\.com|t\.co|twimg\.com|instagram\.com|linkedin\.com)(?:[/:?]|$)", re.I)
+
+
+def links(meta: dict, body: str) -> list[str]:
+    """The outside URLs a source note contains, for tools' Link lines. Found by
+    code so the model can only pick among real ones."""
+    found = [u.rstrip(".,;:!?*") for u in URL.findall(body)]
+    if meta.get("source") not in ("x", "instagram", "linkedin"):  # a page or repository is itself the link
+        found.insert(0, str(meta.get("url") or ""))
+    return list(dict.fromkeys(u for u in found if u and not POST_HOSTS.match(u)))[:12]
+
+
 def compose(key: str, meta: dict) -> str:
     """Write a topic page body from all of its source notes."""
-    notes = []
+    notes, looks = [], 0
     for i, rel in enumerate(meta["sources"], 1):
         src_meta, src_body = read_page(WIKI / rel)
         src_body = re.sub(r"\A# .*\n+", "", src_body)  # the note's own title
         src_body = re.sub(r"^Filed under .*\n+", "", src_body, flags=re.M)
+        looks += "## Visual style" in src_body and "## What it shows" not in src_body
+        found = links(src_meta, src_body)
         notes.append((f"[{i}] {src_meta.get('title', rel)} — {src_meta.get('url', '')}\n"
-                      f"{src_meta.get('summary', '')}", src_body))
+                      f"{src_meta.get('summary', '')}" + (f"\nLinks: {', '.join(found)}" if found else ""),
+                      src_body))
+    category, slug = key.split("/")
+    # A style topic: named so, or a design topic whose captures are mostly looks.
+    style_topic = slug.startswith("style-") or (category == "design" and looks * 2 > len(notes))
     per_note = SOURCE_BUDGET // max(len(notes), 1)
     listing = "\n\n".join(f"{head}\n{body[:per_note]}" for head, body in notes)
     prompt = (f"Topic: {meta['title']} ({key}) — {meta.get('summary', '')}\n"
-              f"Category: {key.split('/')[0]}\n\nSource notes:\n\n{listing}")
+              f"Category: {category}" + ("\nKind: visual style" if style_topic else "") +
+              f"\n\nSource notes:\n\n{listing}")
     body = p.unfence(p.chat(COMPOSE, prompt, num_ctx=32768)).strip()
+    # Fields the model filled with nothing, despite the prompt.
+    body = re.sub(r"^\*\*[A-Za-z][^*\n]{0,40}:\*\*[ \t]*(?:none|n/?a|not (?:stated|specified|mentioned))\.?[ \t]*\n?",
+                  "", body, flags=re.M | re.I)
     body = re.sub(r"\A# .*\n+", "", body)  # the code writes the title
     body = strip_generated(body)  # in case it writes its own "See also" or sources
     # Each "**Field:**" line as its own paragraph; otherwise Markdown joins them into one.
@@ -363,14 +450,16 @@ def compose(key: str, meta: dict) -> str:
 
 def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                  note: str | None, patterns: list, style: dict | None,
-                 style_name: str | None = None) -> dict:
+                 style_name: str | None = None, ideas: list | None = None,
+                 intent: str | None = None) -> dict:
     body = source_body(note=note, text=media.get("text"), page=media.get("page"),
-                       patterns=patterns, style=style)
+                       patterns=patterns, style=style, ideas=ideas or [],
+                       long_text=bool(media.get("article")))
     header = f"URL: {url}\nFrom: {source}" + (f" · @{media['author']}" if media.get("author") else "")
 
     detach(cid)
     known = topics()
-    cls = classify(header, body, known)
+    cls = classify(header, body, known, intent)
 
     category = cls.get("category") if cls.get("category") in CATEGORIES else "features"
     slug = slugify(str(cls.get("topic") or cls.get("topic_title") or "misc"))
@@ -402,7 +491,7 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
     write_page(WIKI / rel,
                {"title": title, "summary": summary, "url": url, "source": source,
                 "author": media.get("author"), "captured": captured,
-                "topic": key, "tags": tags, "capture": cid, "note": note},
+                "topic": key, "tags": tags, "capture": cid, "note": note, "analyzed": ANALYZED},
                f"# {title}\n\n{summary}\n\n"
                f"Filed under [{meta['title']}](../../{key}.md) · [original]({url})\n\n{body}")
 
