@@ -63,6 +63,23 @@ is rough priority.
   sources as one block per pattern (use it when, steps, motion, pitfalls), a
   "Choosing" section, and an index that lists every pattern.
 
+## hypar: from references to your own ideas
+
+[hypar](https://github.com/albegosu/hypar) grows your own ideas; second-brain
+keeps what others made. The bridge runs from the wiki repository, which holds
+every credential, so the deployed hypar never reads the private wiki.
+
+- ~~**Idea to grow.**~~ Done: a Shortcut intent that plants the note as a latent
+  embryo through a per-user hypar token, with the original and the source note
+  beside it.
+- **References as contrast.** After each capture, send `index.md` (topic and
+  pattern names, no quoted posts) so hypar's agent can press on a growing idea
+  with what you already saved. Only while probing and opening paths, never when
+  the problem is still being defined. An experiment in hypar first.
+- **Fossils as practices.** Pull hypar's fossils and mature embryos into the
+  `practices` category, so the reason an idea died reaches the coding agent
+  before it builds the same thing again. Needs text-only captures.
+
 ## Agent access: beyond the skill
 
 - **Curated references as a fallback.** When the wiki has nothing on a subject,

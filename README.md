@@ -261,9 +261,10 @@ publishable key and your capture token. The file holds nothing personal;
 `python shortcut/build.py` generates and signs it on macOS.
 
 When you share, it asks what caught your eye (**Pattern to reuse**, **Visual
-style**, **Tool to try**, **Idea to read** or **Just save**) and then for an
-optional note. Both reach the worker as `intent: … — note`: the intent steers the
-category and the note goes into the analysis.
+style**, **Tool to try**, **Idea to read**, **Idea to grow** or **Just save**) and
+then for an optional note. Both reach the worker as `intent: … — note`: the intent
+steers the category and the note goes into the analysis. **Idea to grow** also
+plants the note in [hypar](#hypar).
 
 **To build it by hand,** or to use the local inbox instead of Supabase:
 
@@ -288,6 +289,36 @@ The note is worth it: it goes into the prompt and improves the analysis a lot,
 because you know what caught your eye and the model doesn't. A note can also
 start with `intent: Tool to try —` (or any of the menu's intents) when you build
 the Shortcut by hand.
+
+## hypar
+
+[hypar](https://github.com/albegosu/hypar) is a garden for your own ideas: each
+one starts as a one-sentence seed and an agent challenges it. When a capture
+gives you an idea, share it as **Idea to grow** and write the idea as the note.
+The capture is filed as usual, and the worker then plants the note in your
+hypar garden as a latent embryo, with the original link and the source note
+beside it.
+
+- **The seed is your note**, never the model's summary. Without a note nothing
+  is planted, and the notification says so.
+- **What goes to hypar:** the note, the post URL and the source note's GitHub
+  URL. That link only opens for people who can read the wiki repository.
+- **A failure doesn't lose the capture.** It is already filed; the notification
+  says hypar couldn't be reached. Share it again later: hypar ignores a URL it
+  already has, so nothing is planted twice.
+- `--reanalyze` never plants.
+
+To connect it, create a token in hypar under **Settings → integrations** and add
+both values to the wiki repository (the capture workflow already passes them):
+
+```bash
+gh secret set HYPAR_URL -R <owner>/second-brain-wiki     # e.g. https://hypar.example.com
+gh secret set HYPAR_TOKEN -R <owner>/second-brain-wiki   # hyp_…
+```
+
+A wiki repository created before this needs the two `HYPAR_*` lines of
+[templates/wiki-repo/.github/workflows/capture.yml](templates/wiki-repo/.github/workflows/capture.yml)
+in its own `capture.yml`.
 
 ## Phone notifications
 
@@ -315,6 +346,7 @@ Only the title, the summary and the URL go to ntfy.sh.
 | `SUPABASE_URL` · `SUPABASE_KEY` · `WORKER_TOKEN` | — | Supabase inbox |
 | `INBOX_TOKEN` · `INBOX_URL` | — · `http://localhost:8000` | Shortcut token · local inbox |
 | `NTFY_TOPIC` | — | phone notifications |
+| `HYPAR_URL` · `HYPAR_TOKEN` | — | plant **Idea to grow** notes in hypar |
 | `BRAIN_GIT_SYNC` | — | `1` to commit and push the wiki automatically after each capture |
 | `POLL_INTERVAL` | `60` | seconds between inbox polls |
 

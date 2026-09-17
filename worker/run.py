@@ -13,6 +13,7 @@ machine that can reach Ollama:
 It keeps no state of its own: a capture is filed if a source note with its URL
 exists in wiki/sources, and the next capture number comes from the existing notes.
 "style: name" (or "estilo: name") in the note files it under design/style-<name>.
+Shared as "Idea to grow", the note is also planted as an embryo in hypar.
 """
 import argparse
 import os
@@ -24,6 +25,7 @@ from datetime import date
 
 import httpx
 
+from . import hypar
 from . import pipeline as p
 from . import wiki
 
@@ -50,7 +52,7 @@ GIT_SYNC = os.environ.get("BRAIN_GIT_SYNC") == "1"
 MAX_ATTEMPTS = 5
 
 STYLE_TAG = re.compile(r"\b(?:style|estilo):\s*([a-z0-9][a-z0-9-]*)", re.I)
-INTENT_TAG = re.compile(r"\bintent:\s*(pattern to reuse|visual style|tool to try|idea to read|just save)[\s—–:-]*", re.I)
+INTENT_TAG = re.compile(r"\bintent:\s*(pattern to reuse|visual style|tool to try|idea to read|idea to grow|just save)[\s—–:-]*", re.I)
 # Below this many words, with no image, video or note, there's nothing to file:
 # the model would have to make the capture up.
 MIN_WORDS = 25
@@ -133,7 +135,27 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
             return {"text": f"#{cid} will retry: {e}", "error": str(e), "transient": True}
         # On a computer the capture stays in the local wiki and goes out with the next push.
         print(f"[worker] wiki commit failed: {e} {getattr(e, 'stderr', '') or ''}", file=sys.stderr)
-    return {"text": f"#{cid}: {entry['category']}/{entry['topic']} · {entry['title']}", "entry": entry}
+    result = {"text": f"#{cid}: {entry['category']}/{entry['topic']} · {entry['title']}", "entry": entry}
+    if intent == hypar.INTENT and not reanalyze:
+        result.update(grow(url, vlm_note, entry))
+        result["text"] += (f" · planted in hypar ({result['embryo']['id']})" if "embryo" in result
+                           else f" · not planted in hypar: {result['hypar_error']}")
+    return result
+
+
+def grow(url: str, note: str | None, entry: dict) -> dict:
+    """Plants the note in hypar. The capture is already filed, so a failure here
+    is reported, not retried: share it again once hypar is back and it's planted
+    (hypar ignores a URL it already has)."""
+    if not hypar.enabled():
+        return {"hypar_error": "HYPAR_URL and HYPAR_TOKEN aren't set"}
+    if not note:
+        return {"hypar_error": "no note: the seed has to be your own thought"}
+    try:
+        return {"embryo": hypar.plant(note, url, hypar.source_link(wiki.WIKI, entry["source"]))}
+    except Exception as e:
+        print(f"[worker] hypar unreachable: {e}", file=sys.stderr)
+        return {"hypar_error": str(e)[:200]}
 
 
 def commit_wiki(subject: str, body: str = ""):
@@ -183,6 +205,11 @@ def notify(url: str, result: dict):
         if entry["new_topic"]:
             title += " (new topic)"
         message, tags = f"{entry['title']}\n{entry['summary']}".strip(), ["white_check_mark"]
+        if embryo := result.get("embryo"):
+            message += "\nPlanted in hypar as a latent embryo"
+            url = hypar.embryo_url(embryo["id"])
+        elif "hypar_error" in result:
+            message += f"\nNot planted in hypar: {result['hypar_error']}"
     elif result.get("already"):
         title, message, tags = "Already saved", url, ["information_source"]
     else:

@@ -65,6 +65,8 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           WORKER_TOKEN: ${{ secrets.WORKER_TOKEN }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          HYPAR_URL: ${{ secrets.HYPAR_URL }}      # optional: plant "Idea to grow" notes in hypar
+          HYPAR_TOKEN: ${{ secrets.HYPAR_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           OLLAMA_HOST: https://ollama.com
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
