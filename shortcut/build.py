@@ -70,9 +70,13 @@ def build() -> dict:
     # "Get URLs from" reads a text field; a bare variable there is ignored and yields no URL
     urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
     first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    # One tap says what the capture is for; the worker reads it as "intent: …".
+    intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Just save"])
+    intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
+                    WFChooseFromListActionPrompt="What caught your eye?")
     # A separate action: "Ask Each Time" inside the JSON body makes Shortcuts ask
     # for the whole dictionary instead of the note alone.
-    note = action("ask", WFAskActionPrompt="Note (optional): what caught your eye?", WFInputType="Text")
+    note = action("ask", WFAskActionPrompt="What do you want to reuse from this? (optional)", WFInputType="Text")
     post = action(
         "downloadurl",
         WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
@@ -82,14 +86,15 @@ def build() -> dict:
         WFHTTPHeaders=dictionary(apikey=text(output(key, "Text"))),
         WFHTTPBodyType="JSON",
         WFJSONValues=dictionary(url=text(output(first, "Item from List")),
-                                note=text(output(note, "Provided Input")),
+                                note=text("intent: ", output(intent, "Chosen Item"), " — ",
+                                          output(note, "Provided Input")),
                                 token=text(output(token, "Text"))),
     )
     status = action("getvalueforkey", WFInput=attachment(output(post, "Contents of URL")),
                     WFDictionaryKey="status", WFGetDictionaryValueType="Value")
     group = str(uuid.uuid4()).upper()
     actions = [
-        supabase, key, token, urls, first, note, post, status,
+        supabase, key, token, urls, first, intents, intent, note, post, status,
         action("conditional", GroupingIdentifier=group, WFControlFlowMode=0, WFCondition=4,
                WFConditionalActionString="queued",
                WFInput={"Type": "Variable",

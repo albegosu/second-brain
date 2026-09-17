@@ -62,24 +62,34 @@ repository are public and print what was captured. Point `BRAIN_WIKI` at its
 wiki/
   index.md                      map of topics; written by code
   design/ features/ tools/      one page per topic
+  practices/
   sources/2026-09/0007-….md     one note per capture
 ```
 
 - **Categories:**
-  - `design`: how an interface looks and moves.
+  - `design`: how an interface looks and moves. Topics that collect a look are
+    named `style-*`.
   - `features`: what a product does for its user.
   - `tools`: tools, libraries and services.
+  - `practices`: how to work (engineering practices, workflows with agents,
+    lessons from articles).
 - **Source notes** (`sources/`): written by code from what was extracted, with
-  no reinterpretation. They hold your note, the patterns the model saw, the style
-  with its pixel-measured palette, the post or page text, and a link to the
-  original.
+  no reinterpretation. They hold your note, the patterns the model saw, the key
+  ideas of an article or long text, the style with its pixel-measured palette,
+  the post or page text, and a link to the original.
 - **Topic pages:** the model picks the topic (reusing an existing one if it fits)
   and rewrites the page from all of its source notes, citing them as `[n]`. Pages
-  are built for an agent about to implement something: one block per pattern
-  (**Use it when**, **How it works**, **Motion**, **Watch out**), a "Choosing"
-  section when there are several, and "See also" links. The frontmatter, "See
-  also", the sources list and the index (which lists every pattern) are written by
-  code, so a bad answer can at most spoil a text, never the navigation.
+  are built for an agent about to implement something, with one block per item:
+  patterns (**Use it when**, **How it works**, **Motion**, **Watch out**), styles
+  as a DESIGN.md-like sheet (**Tokens**, **Composition**, **Do**, **Don't**),
+  tools (**What it does**, **Use it when**, **Link**) or ideas (**Claim**, **Why it
+  matters**, **How to apply**). A "Choosing" section follows when there are
+  several, and "See also" links. The frontmatter, "See also", the sources list,
+  the links a tool can use and the index are written by code, so a bad answer can
+  at most spoil a text, never the navigation.
+- **Nothing is guessed:** a capture with no image, video or text to read (a bare
+  link, a one-line caption) isn't filed; you get a notification asking to share
+  it again with a note.
 - **Language:** everything in English.
 - **Commits:** with `BRAIN_GIT_SYNC=1`, the worker commits and pushes the wiki
   folder to the repository that holds it after each capture. The commits are
@@ -90,8 +100,10 @@ wiki/
 A note with `style: name` (or `estilo: name`) files the capture under
 `design/style-name`, to collect a look across several captures.
 
-After changing the prompts, this runs the model again over every capture and
-rewrites the wiki:
+After changing the analysis, this runs the model again over every capture the
+current version hasn't analyzed (source notes record it as `analyzed`) and
+rewrites the wiki. If it stops on a quota or network error, run it again and it
+resumes:
 
 ```bash
 python -m worker.run --reanalyze
@@ -118,7 +130,7 @@ python -m worker.lint --no-plan        # skip the model's plan, only apply the r
 
 | Source | How |
 |---|---|
-| X | fxtwitter: video, GIF, image or text-only post |
+| X | fxtwitter: video, GIF or image; X Articles as text, with their key ideas; the media of a quoted post; the page a post without media links to |
 | Instagram, LinkedIn | video through yt-dlp with your browser cookies (`BRAIN_COOKIES`); if yt-dlp can't get it, the video the page publishes as JSON-LD, and failing that (photos, carousels) the cover image |
 | GitHub repositories | description and README through the API; as media, the first image, GIF or video in the README (badges skipped), else a screenshot of the project's homepage |
 | YouTube, Vimeo, TikTok, Bluesky and every other site yt-dlp has an extractor for | the video through yt-dlp, at most 720p and 10 minutes; if it can't be downloaded, the page's thumbnail and description |
@@ -230,6 +242,11 @@ Files). Shortcuts asks for three values: your Supabase project URL, its
 publishable key and your capture token. The file holds nothing personal;
 `python shortcut/build.py` generates and signs it on macOS.
 
+When you share, it asks what caught your eye (**Pattern to reuse**, **Visual
+style**, **Tool to try**, **Idea to read** or **Just save**) and then for an
+optional note. Both reach the worker as `intent: … — note`: the intent steers the
+category and the note goes into the analysis.
+
 **To build it by hand,** or to use the local inbox instead of Supabase:
 
 1. New shortcut → ⓘ → **Show in Share Sheet**. Receive **URLs** and **Text**
@@ -250,7 +267,9 @@ In Shortcuts, clicking a variable pill and typing renames the variable. To write
 text, press **Clear** first and type in the empty field.
 
 The note is worth it: it goes into the prompt and improves the analysis a lot,
-because you know what caught your eye and the model doesn't.
+because you know what caught your eye and the model doesn't. A note can also
+start with `intent: Tool to try —` (or any of the menu's intents) when you build
+the Shortcut by hand.
 
 ## Phone notifications
 

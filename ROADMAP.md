@@ -12,6 +12,9 @@ is rough priority.
   through the API (README text and demo media), video sites through yt-dlp, and
   direct image or video links. Still open: text from the rendered HTML of
   client-side pages, and scrolling past the first screen.
+- ~~**X, completely.**~~ Done: X Articles are read as text, a post without media
+  uses its quoted post's media or the page it links to, and a capture with
+  nothing to read fails and asks for a note instead of being guessed.
 - **Images shared directly.** Photos and screenshots from the share sheet, not
   only links: upload from the Shortcut to storage, run OCR plus the vision
   analysis, and file them like any other capture.
@@ -34,10 +37,13 @@ is rough priority.
   duplicate topics, splits catch-alls, moves misfiled captures, adds "See also"
   links and reports contradictions in the commit message.
   *Inspired by Karpathy's LLM wiki pattern.*
-- **Style topics as `DESIGN.md`.** Turn `design/style-*` pages into a design
-  system sheet that agents already know how to apply: tokens, typography, spacing,
-  motion, and do/don't guidance.
+- ~~**Style topics as `DESIGN.md`.**~~ Done: design topics made of looks (or
+  named `style-*`) are written as a `## Styles` sheet with tokens (measured
+  palette, type, radius, spacing, depth, motion), composition and do/don't.
   *Inspired by Refero Styles.*
+- ~~**Ideas from what you read.**~~ Done: a `practices` category; articles and
+  long texts get their key ideas extracted, and topic pages list them with claim,
+  why and how to apply.
 - **Topic hierarchy.** When a category grows, group topics into clusters and
   subtopics so the index stays scannable in one read.
   *Inspired by ContextBolt's topic clusters.*

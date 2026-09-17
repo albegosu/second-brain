@@ -1,6 +1,6 @@
 ---
 name: second-brain
-description: The user's personal knowledge base, kept as a Markdown wiki of things they saved from X, Instagram, LinkedIn and the web. It has three categories. design covers UI patterns, interactions, motion and visual styles. features covers product functionality worth building. tools covers apps, libraries and services. Check it BEFORE designing or implementing a UI component, animation, interaction or product feature, and before choosing a tool or library, in case there is a saved reference. Also use it when asked "¿tengo algo guardado sobre…?", "busca en mi second brain", "what did I save about…", "hazlo con el estilo X", or for inspiration.
+description: The user's personal knowledge base, kept as a Markdown wiki of things they saved from X, Instagram, LinkedIn and the web. It has four categories. design covers UI patterns, interactions, motion and visual styles. features covers product functionality worth building. tools covers apps, libraries and services. practices covers how to work: engineering practices, workflows with AI agents and lessons from articles. Check it BEFORE designing or implementing a UI component, animation, interaction or product feature, before choosing a tool or library, and when deciding how to approach agent or engineering work, in case there is a saved reference. Also use it when asked "¿tengo algo guardado sobre…?", "busca en mi second brain", "what did I save about…", "hazlo con el estilo X", or for inspiration.
 ---
 
 # Second brain
@@ -15,10 +15,13 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 
 ## How to use it
 
-1. Read `wiki/index.md` first. For every topic it lists a one-line summary and the patterns (or, for tools, the options) the page holds, plus the latest captures. Match on pattern names, not only topic titles. Don't read whole folders.
-2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed:
-   - `## Patterns` (or `## Options` for tools): one `### <name> [n]` block each, with **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
-   - `## Choosing`: which pattern fits which situation, when there are several.
+1. Read `wiki/index.md` first. For every topic it lists a one-line summary and the blocks the page holds (patterns, styles, options or ideas), plus the latest captures. Match on block names, not only topic titles. Don't read whole folders.
+2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed, one `### <name> [n]` block per item:
+   - `## Patterns` (design, features): **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
+   - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. Apply it like a DESIGN.md.
+   - `## Options` (tools): **What it does**, **Use it when**, **Link** (only URLs found in the sources) and **Notes**.
+   - `## Ideas` (practices): **Claim**, **Why it matters**, **How to apply**, **Watch out**.
+   - `## Choosing`: which one fits which situation, when there are several.
    - `## See also`: related topics of the same category worth opening when the task spans them. A relevant tool page won't be linked from a design page, so check the index's tools section too.
    - `## Sources`: citations like `[2]` point here.
 3. Open a source note (`wiki/sources/…`) only when you need the specifics: the user's note, the measured palette, the original post text or the link to the video.
