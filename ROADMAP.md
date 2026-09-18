@@ -27,7 +27,11 @@ is rough priority.
   speech and feed it to the analysis next to the frames, so spoken context isn't
   lost.
   *Inspired by Fabric and ReelRecall.*
-- **Every image of a carousel,** not just the cover.
+- ~~**Every image of a carousel,** not just the cover.~~ Done: an X post whose
+  media are all photos, or an Instagram post yt-dlp reads as a playlist, downloads
+  every image (up to twelve) into `extra`, so the analysis and the contact sheet
+  see the whole set. A video, or a post that mixes video and photos, keeps the
+  first item as before.
 - **Reliable Instagram reels from GitHub Actions,** where there are no browser
   cookies and data-center IPs get blocked more often.
 

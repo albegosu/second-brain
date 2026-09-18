@@ -192,6 +192,18 @@ def fetch_x(url: str, cid: int) -> dict | None:
         quoted = (quote.get("author") or {}).get("screen_name")
         text = f"{text}\n\nQuoting @{quoted}: {(quote.get('text') or '').strip()}".strip()
     if media:
+        images = [m for m in media if m["type"] not in ("video", "gif")]
+        # A carousel of images: keep every one, not just the cover, so the analysis
+        # and the contact sheet see the whole thing. A video (its keyframes already
+        # cover it) or a post that mixes video and photos falls back to the first item.
+        if len(images) > 1 and len(images) == len(media):
+            paths = []
+            for i, item in enumerate(images):
+                path = MEDIA / (f"{cid}.jpg" if i == 0 else f"{cid}-{i}.jpg")
+                path.write_bytes(httpx.get(item["url"], follow_redirects=True, timeout=120).content)
+                paths.append(path)
+            return {"path": paths[0], "extra": paths[1:], "kind": "image",
+                    "author": author, "text": text}
         item = media[0]
         kind = "video" if item["type"] in ("video", "gif") else "image"
         path = MEDIA / f"{cid}.{'mp4' if kind == 'video' else 'jpg'}"
@@ -219,12 +231,21 @@ def fetch_ytdlp(url: str, cid: int) -> dict:
         BRAIN_COOKIES=firefox:xxxx.dev-edition-default (browser:profile)
         BRAIN_COOKIES=/path/to/cookies.txt
     """
+    # A re-analysis of a now-shorter carousel must not inherit stale extra frames.
+    for old in MEDIA.glob(f"{cid}-*"):
+        old.unlink()
+    for old in MEDIA.glob(f"{cid}.*"):
+        old.unlink()
+
     opts = {
-        "outtmpl": str(MEDIA / f"{cid}.%(ext)s"),
-        "noplaylist": True,
+        # An index per entry: a carousel downloads to {cid}-01.jpg, {cid}-02.jpg…,
+        # a single post to {cid}-01.<ext>. Unique names, no overwrite.
+        "outtmpl": str(MEDIA / f"{cid}-%(autonumber)02d.%(ext)s"),
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,  # quiet doesn't silence the download bar: it would flood the log
+        # A carousel is a short playlist; a shared profile URL is not, so cap it.
+        "playlistend": 12,
         # Frames are scaled to 1024 px and a demo is short: no 4K, no hour-long talks.
         "format": "b[height<=?720]/bv*[height<=?720]/b",
         "match_filter": yt_dlp.utils.match_filter_func("duration <=? 600"),
@@ -240,13 +261,23 @@ def fetch_ytdlp(url: str, cid: int) -> dict:
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
 
-    path = Path(ydl.prepare_filename(info))
-    if not path.exists():  # skipped by match_filter
+    entries = [e for e in (info.get("entries") or [info]) if e] or [info]
+    paths = sorted(pth for pth in MEDIA.glob(f"{cid}-*")
+                   if pth.suffix in (".jpg", ".png", ".webp", ".mp4", ".gif", ".webm"))
+    if not paths:  # everything skipped by match_filter (too long)
         raise yt_dlp.utils.DownloadError(f"not downloaded, longer than 10 minutes? {url}")
-    return {"path": path,
-            "kind": "image" if path.suffix in (".jpg", ".png", ".webp") else "video",
-            "author": info.get("uploader") or info.get("channel"),
-            "text": info.get("description")}
+    author = info.get("uploader") or info.get("channel") or entries[0].get("uploader")
+    text = info.get("description") or entries[0].get("description")
+
+    def kind_of(pth: Path) -> str:
+        return "image" if pth.suffix in (".jpg", ".png", ".webp") else "video"
+
+    # A carousel of images: keep them all. A video (its keyframes already cover it)
+    # or a post that mixes video and photos falls back to the first item.
+    if len(paths) > 1 and all(kind_of(pth) == "image" for pth in paths):
+        return {"path": paths[0], "extra": paths[1:], "kind": "image",
+                "author": author, "text": text}
+    return {"path": paths[0], "kind": kind_of(paths[0]), "author": author, "text": text}
 
 
 POST_TYPES = {"VideoObject", "SocialMediaPosting", "DiscussionForumPosting",
