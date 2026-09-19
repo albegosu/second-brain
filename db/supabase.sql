@@ -216,3 +216,74 @@ revoke execute on function public.pending(text), public.claim(bigint, text, text
   public.retry(bigint, text, text) from public, authenticated;
 grant execute on function public.pending(text), public.claim(bigint, text, text),
   public.retry(bigint, text, text) to anon;
+
+
+-- 3. Image captures: a shared screenshot or photo has no URL, only its bytes.
+--
+-- The Shortcut calls capture_image() with the image base64-encoded; the worker
+-- keys it by its content hash, so the same image shared twice isn't filed twice.
+-- url becomes nullable (a row is either a URL or an image), and the base64 lives
+-- in the row but stays out of pending(): the worker pulls it with fetch_image()
+-- only for the capture it's about to file, so a poll doesn't drag every image.
+
+alter table public.inbox alter column url drop not null;
+alter table public.inbox add column if not exists image text;  -- base64
+alter table public.inbox add column if not exists mime text;
+alter table public.inbox drop constraint if exists inbox_has_content;
+alter table public.inbox add constraint inbox_has_content check (url is not null or image is not null);
+
+create or replace function public.capture_image(image text, mime text, note text default null,
+                                                token text default null)
+returns json
+language plpgsql security definer set search_path = ''
+as $$
+#variable_conflict use_variable
+begin
+  if not private.token_ok('capture', token) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+  if mime is null or mime not in ('image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif') then
+    raise exception 'unsupported image type' using errcode = '22023';
+  end if;
+  if image is null or length(image) < 64 or length(image) > 12000000 then  -- ~9 MB of image
+    raise exception 'invalid image' using errcode = '22023';
+  end if;
+  insert into public.inbox (mime, image, note) values (mime, image, nullif(trim(note), ''));
+  return json_build_object('status', 'queued');
+end
+$$;
+
+drop function if exists public.pending(text);
+create function public.pending(token text)
+returns table (id bigint, url text, note text, mime text, attempts int)
+language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  if not private.token_ok('worker', token) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+  return query
+    select i.id, i.url, i.note, i.mime, i.attempts from public.inbox i
+    where i.claimed_at is null order by i.id limit 20;
+end
+$$;
+
+-- Worker: the base64 image of one row, only when it's the row being filed.
+create or replace function public.fetch_image(item_id bigint, token text)
+returns text
+language plpgsql stable security definer set search_path = ''
+as $$
+declare data text;
+begin
+  if not private.token_ok('worker', token) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+  select i.image into data from public.inbox i where i.id = item_id;
+  return data;
+end
+$$;
+
+revoke execute on function public.capture_image(text, text, text, text),
+  public.fetch_image(bigint, text), public.pending(text) from public, authenticated;
+grant execute on function public.capture_image(text, text, text, text) to anon;  -- capture token
+grant execute on function public.fetch_image(bigint, text), public.pending(text) to anon;  -- worker token

@@ -153,7 +153,8 @@ topic was used, so what proves useful stands out from what was only saved.
 | GitHub repositories | description and README through the API; as media, the first image, GIF or video in the README (badges skipped), else a screenshot of the project's homepage |
 | YouTube, Vimeo, TikTok, Bluesky and every other site yt-dlp has an extractor for | the video through yt-dlp, at most 720p and 10 minutes; if it can't be downloaded, the page's thumbnail and description |
 | Direct links to an image or a video | the file itself |
-| Any other site | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome) plus `og:image` |
+| Any other site (news, articles) | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome), the article's own figures and `og:image` |
+| A shared image (a screenshot or photo, no URL) | the image itself, analyzed like any other capture; if it holds no interface pattern, its text is read so it can still yield ideas. Identified by a content hash, so the same image shared twice isn't filed twice |
 
 ## Setup
 
@@ -214,6 +215,14 @@ iPhone on the same Wi-Fi. Create `.env` with `INBOX_TOKEN`,
 
 ```bash
 bin/second-brain
+```
+
+To file one thing without the inbox — a URL, or a local image such as a
+screenshot or photo — run the worker directly:
+
+```bash
+python -m worker.run --url https://example.com/article --note "why it caught my eye"
+python -m worker.run --image ~/Desktop/screenshot.png --note "the empty state"
 ```
 
 To start it at login, use a LaunchAgent that runs `/bin/sh bin/second-brain`

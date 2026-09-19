@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import math
 import mimetypes
@@ -31,6 +32,11 @@ VLM = os.environ.get("BRAIN_VLM", "gemma4:31b-cloud")
 ROOT = Path(__file__).resolve().parent.parent
 # Absolute, so paths stay valid whatever the working directory.
 MEDIA = Path(os.environ.get("BRAIN_MEDIA", ROOT / "data" / "media")).expanduser().resolve()
+
+# The identity of a capture that is a bare image (a shared screenshot or photo
+# with no URL), keyed by the image's content so re-sharing it dedups against the
+# filed capture. detect_source() maps it to the "image" source.
+IMAGE_SCHEME = "sb-image://"
 
 # Closed vocabulary (what each value means: docs/taxonomy.md). The prompt and
 # clean_patterns() are built from it.
@@ -118,6 +124,8 @@ Rules:
 
 
 def detect_source(url: str) -> str:
+    if url.startswith(IMAGE_SCHEME):
+        return "image"
     host = httpx.URL(url).host.removeprefix("www.")
     if host in ("x.com", "twitter.com"):
         return "x"
@@ -146,7 +154,10 @@ TRACKING_X = re.compile(r"s|t")  # meaningless on X; on an arbitrary site they m
 
 
 def canonical_url(url: str) -> str:
-    u = httpx.URL(url.strip())
+    url = url.strip()
+    if url.startswith(IMAGE_SCHEME):  # a content hash, not a URL: nothing to canonicalize
+        return url
+    u = httpx.URL(url)
     x = detect_source(str(u)) == "x"
     for key in set(u.params.keys()):
         if TRACKING.fullmatch(key) or (x and TRACKING_X.fullmatch(key)):
@@ -344,6 +355,26 @@ def download_media(url: str, cid: int) -> dict:
     return save_media(r, cid)
 
 
+def image_ref(data: bytes) -> str:
+    """The identity of a bare image, from its content, so the same screenshot
+    shared twice dedups against the capture already filed."""
+    return IMAGE_SCHEME + hashlib.sha256(data).hexdigest()[:16]
+
+
+def save_image_bytes(data: bytes, cid: int) -> dict:
+    """A shared screenshot or photo (no URL): stored as one jpg, like any other
+    single-image capture. HEIC and PNG are normalized to jpg by to_jpg()."""
+    if not data:
+        raise RuntimeError("no image data")
+    MEDIA.mkdir(parents=True, exist_ok=True)
+    src = MEDIA / f"{cid}.download"
+    src.write_bytes(data)
+    try:
+        return {"path": to_jpg(src, MEDIA / f"{cid}.jpg"), "kind": "image"}
+    finally:
+        src.unlink(missing_ok=True)
+
+
 def chrome() -> str | None:
     """Chrome or Chromium for screenshots: BRAIN_CHROME, the PATH (GitHub's Ubuntu
     runners ship google-chrome) or the macOS app."""
@@ -450,6 +481,50 @@ def fetch_github(url: str, cid: int) -> dict | None:
     return result
 
 
+FIGURE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")  # a markdown image, as trafilatura emits it
+
+
+def article_images(html: str, base_url: str, cid: int, limit: int = 4) -> list[Path]:
+    """The images inside the article body (figures, diagrams, screenshots), as
+    opposed to a screenshot of the whole page: trafilatura keeps only the ones
+    that belong to the main content, so navigation, badges and ads are left out.
+    Small images (icons, tracking pixels) and non-photos (svg, gif) are skipped.
+    They ride along as extra frames, so the contact sheet and the analysis see the
+    real figures and not only a picture of the page."""
+    try:
+        md = trafilatura.extract(html, url=base_url, favor_precision=True, include_images=True,
+                                 include_comments=False, output_format="markdown") or ""
+    except Exception as e:
+        print(f"[pipeline] article images dropped: {e}", file=sys.stderr)
+        return []
+    paths, seen = [], set()
+    for src in FIGURE.findall(md):
+        if len(paths) >= limit:
+            break
+        src = urljoin(base_url, src.strip())
+        if src in seen or src.startswith("data:") or BADGE.search(src):
+            continue
+        seen.add(src)
+        try:
+            r = httpx.get(src, follow_redirects=True, timeout=60, headers=UA)
+            r.raise_for_status()
+            ctype = (r.headers.get("content-type") or "").split(";")[0].strip().lower()
+            if ctype in ("image/svg+xml", "image/gif") or not ctype.startswith("image/"):
+                continue
+            if len(r.content) < 8000:  # icons, spacers, tracking pixels
+                continue
+            n = len(paths)
+            tmp = MEDIA / f"{cid}-fig{n}.download"
+            tmp.write_bytes(r.content)
+            try:
+                paths.append(to_jpg(tmp, MEDIA / f"{cid}-fig{n}.jpg"))
+            finally:
+                tmp.unlink(missing_ok=True)
+        except Exception as e:
+            print(f"[pipeline] article image dropped: {e}", file=sys.stderr)
+    return paths
+
+
 def fetch_page(url: str, cid: int, visible_text: bool = True) -> dict:
     """Regular web pages (tools, landings, articles): title, description, main
     text and how the page looks. If the page publishes a video or a post as
@@ -504,6 +579,8 @@ def fetch_page(url: str, cid: int, visible_text: bool = True) -> dict:
     images = []
     if visible_text and (shot := screenshot(str(r.url), cid)):
         images.append(shot)
+    if visible_text:  # the article's own figures, ahead of og:image (often a marketing card)
+        images += article_images(html, str(r.url), cid)
     if image := meta("og:image"):
         try:
             og = download_media(urljoin(str(r.url), image), cid)
@@ -514,6 +591,14 @@ def fetch_page(url: str, cid: int, visible_text: bool = True) -> dict:
     if images:
         result.update(path=images[0], kind="image", extra=images[1:])
     return result
+
+
+# Sources whose visible page is a login or cookie wall, not the content: reading
+# its text or taking a screenshot is pointless. A news or article site that only
+# matched a yt-dlp extractor (nytimes, many outlets) is NOT one of these, so when
+# it has no video it's read as a normal page, with its text and figures.
+WALL = {"instagram", "linkedin", "x", "twitter", "youtube", "youtubetab",
+        "vimeo", "tiktok", "bluesky", "facebook", "twitch"}
 
 
 def fetch_media(url: str, source: str, cid: int) -> dict:
@@ -528,10 +613,11 @@ def fetch_media(url: str, source: str, cid: int) -> dict:
     try:
         return fetch_ytdlp(url, cid)
     except yt_dlp.utils.DownloadError as e:
-        # Instagram photos and carousels, LinkedIn videos yt-dlp can't extract, long
-        # or blocked videos: the page serves the video (JSON-LD) or else og:image.
+        # No video: Instagram photos and carousels, LinkedIn posts, blocked or long
+        # videos, or a news/article page that merely matched a video extractor. The
+        # last is read as a full page (text + figures); a real wall is not.
         print(f"[pipeline] no video, using the page: {str(e)[:120]}", file=sys.stderr)
-        result = fetch_page(url, cid, visible_text=False)
+        result = fetch_page(url, cid, visible_text=source not in WALL)
         # Instagram: "490 likes, 80 comments - username on April 29, 2026: "text…""
         if m := re.search(r" - ([\w.]+) on [A-Z][a-z]+ \d{1,2}, \d{4}:", result["page"].get("description") or ""):
             result["author"] = m.group(1)
@@ -738,6 +824,26 @@ def ideas(text: str, note: str | None = None) -> list[dict]:
     data = parse_json(chat(IDEAS, "\n\n".join(prompt), as_json=True, num_ctx=32768))
     items = data.get("ideas") if isinstance(data, dict) else data
     return [i for i in items or [] if isinstance(i, dict) and i.get("title") and i.get("claim")]
+
+
+OCR = """You transcribe the legible text in an image. Return the text in natural
+reading order (headline, then body, then captions), as plain text: no markdown,
+no commentary, no description of the image. If there is no meaningful text (a
+photo, an icon, a UI with no copy), return nothing at all."""
+
+
+def transcribe(frames: list[Path]) -> str:
+    """The text visible in an image, read by the VLM. A shared screenshot of an
+    article or a slide is mostly text; without reading it there is nothing to
+    extract ideas from. Not OCR-grade, but enough to feed ideas() and the
+    min-words gate. Empty when the image carries no real text."""
+    if not frames:
+        return ""
+    try:
+        return chat(OCR, "Transcribe the text in this image.", images=frames[:4]).strip()
+    except Exception as e:
+        print(f"[pipeline] transcription dropped: {e}", file=sys.stderr)
+        return ""
 
 
 def readable_words(media: dict) -> int:

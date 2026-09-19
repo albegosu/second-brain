@@ -7,6 +7,7 @@ machine that can reach Ollama:
     python -m worker.run --once                  # process what's pending and exit
     python -m worker.run                         # keep polling
     python -m worker.run --url URL [--note N]    # direct ingestion, no inbox
+    python -m worker.run --image FILE [--note N] # a screenshot or photo, no URL
     python -m worker.run --url URL --reanalyze   # run the model again
     python -m worker.run --reanalyze             # the whole wiki (after changing prompts)
 
@@ -16,12 +17,14 @@ exists in wiki/sources, and the next capture number comes from the existing note
 Shared as "Idea to grow", the note is also planted as an embryo in hypar.
 """
 import argparse
+import base64
 import os
 import re
 import subprocess
 import sys
 import time
 from datetime import date
+from pathlib import Path
 
 import httpx
 
@@ -87,11 +90,21 @@ def is_transient(e: Exception) -> bool:
 
 
 def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
+    """Ingest a URL: a post or a page."""
+    url = p.canonical_url(url)
+    return _ingest(url, p.detect_source(url), note, reanalyze=reanalyze)
+
+
+def ingest_image(data: bytes, note: str | None = None, reanalyze: bool = False) -> dict:
+    """Ingest a bare image (a shared screenshot or photo, no URL). Its identity is
+    the image's content hash, so the same image shared twice isn't filed twice."""
+    return _ingest(p.image_ref(data), "image", note, reanalyze=reanalyze, image=data)
+
+
+def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
+            image: bytes | None = None) -> dict:
     """Returns {"text": log line} plus "entry" (what was filed), "already" or
     "error" (with "transient" when a retry makes sense)."""
-    url = p.canonical_url(url)
-    source = p.detect_source(url)
-
     existing = wiki.find_source(url)
     if existing and note is None:
         note = existing[1].get("note")  # re-analysis without --note keeps the note
@@ -104,7 +117,7 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
     cid = existing[0] if existing else wiki.next_capture_id()
     captured = str(existing[1].get("captured")) if existing else date.today().isoformat()
     try:
-        media = p.fetch_media(url, source, cid)
+        media = p.save_image_bytes(image, cid) if source == "image" else p.fetch_media(url, source, cid)
         if media["kind"] == "video":
             frames = p.keyframes(media["path"], cid)
         else:
@@ -115,6 +128,11 @@ def ingest(url: str, note: str | None = None, reanalyze: bool = False) -> dict:
         analysis = p.analyze(frames, vlm_note, media.get("text")) if frames else {}
         patterns = p.clean_patterns(analysis.get("patterns") or [])
         look = p.clean_style(analysis.get("style"), frames) if frames else None
+        # A bare image with no interface pattern (a screenshot of an article, a
+        # slide, a chart): read its text so it can still yield ideas.
+        if source == "image" and not patterns and not media.get("text"):
+            media["text"] = p.transcribe(frames)
+            words = p.readable_words(media)
         key_ideas = []
         if media.get("article") or (not patterns and words >= IDEA_WORDS):
             text = "\n\n".join(x for x in (media.get("text"), (media.get("page") or {}).get("excerpt")) if x)
@@ -249,6 +267,21 @@ def inbox(action: str, item_id: int | None = None, reason: str | None = None):
     return r.json()
 
 
+def fetch_inbox_image(item_id: int) -> bytes:
+    """The base64 image of an inbox row, decoded. Kept out of pending() so a
+    poll doesn't drag every image along; fetched only for the row being filed.
+    Supabase hands it over through its own RPC, the local inbox at /image/."""
+    if SUPABASE_URL:
+        r = httpx.post(f"{SUPABASE_URL}/rest/v1/rpc/fetch_image", timeout=60,
+                       json={"item_id": item_id, "token": WORKER_TOKEN},
+                       headers={"apikey": SUPABASE_KEY})
+    else:
+        r = httpx.get(f"{INBOX}/image/{item_id}", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=60)
+    r.raise_for_status()
+    payload = r.json()
+    return base64.b64decode(payload if isinstance(payload, str) else (payload or {}).get("image") or "")
+
+
 def poll_once() -> int:
     try:
         items = inbox("pending")
@@ -257,9 +290,22 @@ def poll_once() -> int:
         return 0
 
     for item in items:
-        url = p.canonical_url(item["url"])
-        print(f"[worker] {url}")
-        result = ingest(url, item.get("note"))
+        note = item.get("note")
+        if item.get("mime"):  # an image capture: fetch and decode its bytes, then file it
+            try:
+                data = fetch_inbox_image(item["id"])
+                url, result = p.image_ref(data), None
+            except Exception as e:
+                url = f"image #{item['id']}"
+                result = {"text": f"couldn't fetch image: {e}", "error": str(e),
+                          "transient": is_transient(e)}
+            if result is None:
+                print(f"[worker] {url} ({item['mime']})")
+                result = ingest_image(data, note)
+        else:
+            url = p.canonical_url(item["url"])
+            print(f"[worker] {url}")
+            result = ingest(url, note)
         print(f"         {result['text']}")
         try:
             if result.get("transient") and int(item.get("attempts") or 0) + 1 < MAX_ATTEMPTS:
@@ -279,11 +325,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--url")
+    ap.add_argument("--image", help="ingest a local image file (a screenshot or photo), no URL")
     ap.add_argument("--note")
     ap.add_argument("--reanalyze", action="store_true",
                     help="analyze again even if already filed (without --url: every note the current "
                          "pipeline hasn't analyzed yet, so an interrupted run resumes)")
     args = ap.parse_args()
+
+    if args.image:
+        print(ingest_image(Path(args.image).read_bytes(), args.note, reanalyze=args.reanalyze)["text"])
+        return
 
     if args.url:
         print(ingest(args.url, args.note, reanalyze=args.reanalyze)["text"])
@@ -296,6 +347,8 @@ def main():
             meta = wiki.read_page(f)[0]
             if int(meta.get("analyzed") or 1) >= wiki.ANALYZED:
                 continue
+            if str(meta.get("url") or "").startswith(p.IMAGE_SCHEME):
+                continue  # a bare image: its bytes aren't kept, so it can't be re-fetched
             result = ingest(meta["url"], meta.get("note"), reanalyze=True)
             print(f"[worker] {meta['url']}\n         {result['text']}")
             if result.get("transient"):

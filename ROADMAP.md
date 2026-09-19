@@ -8,16 +8,22 @@ is rough priority.
 ## Capture: understand anything you share
 
 - ~~**Any URL, robustly.**~~ Done: main-text extraction with trafilatura, a
-  headless Chrome screenshot of every page next to `og:image`, GitHub repositories
-  through the API (README text and demo media), video sites through yt-dlp, and
-  direct image or video links. Still open: text from the rendered HTML of
+  headless Chrome screenshot of every page next to the article's own figures and
+  `og:image`, GitHub repositories through the API (README text and demo media),
+  video sites through yt-dlp, and direct image or video links. A news or article
+  page is read as a page (text and figures) even when a yt-dlp extractor claims
+  its domain but finds no video. Still open: text from the rendered HTML of
   client-side pages, and scrolling past the first screen.
 - ~~**X, completely.**~~ Done: X Articles are read as text, a post without media
   uses its quoted post's media or the page it links to, and a capture with
   nothing to read fails and asks for a note instead of being guessed.
-- **Images shared directly.** Photos and screenshots from the share sheet, not
-  only links: upload from the Shortcut to storage, run OCR plus the vision
-  analysis, and file them like any other capture.
+- **Images shared directly.** Engine done: a bare image (a screenshot or photo,
+  no URL) is filed like any other capture, identified by its content hash, and
+  when it holds no interface pattern its text is read by the VLM (the OCR step) so
+  it can still yield ideas. It arrives base64-encoded through the inbox
+  (`capture_image` on Supabase or the local inbox) or `python -m worker.run
+  --image`. Still open: wiring it into the Shortcut so a share-sheet image uploads
+  straight from the phone.
   *Inspired by mymind and Karakeep.*
 - **Real DOM and CSS for web UI.** For a live web page, capture the actual
   elements and computed styles instead of a screenshot, so style notes carry
