@@ -8,9 +8,10 @@ Shortcuts only imports signed files and only macOS can sign them (`shortcuts
 sign`). The file stores nothing personal: on import, Shortcuts asks for the
 Supabase project URL, the publishable key and the capture token.
 
-The workflow is the one the README describes: share a link or text, take its
-first URL, ask for an optional note, POST it to the capture() function and show
-whether the inbox queued it.
+The workflow is the one the README describes: share a link, text or an image;
+if an image was shared it's converted to JPEG and base64-encoded and POSTed to
+capture_image(), otherwise the first URL goes to capture(); either way it asks
+for an optional note and shows whether the inbox queued it.
 """
 from __future__ import annotations
 
@@ -63,13 +64,34 @@ def dictionary(**items: dict) -> dict:
             "WFSerializationType": "WFDictionaryFieldValue"}
 
 
+def status_block(post: dict, ok_message: str) -> list[dict]:
+    """After a capture POST: read `status` and show ✓/✗. The same check for both
+    branches, so a URL and an image are confirmed the same way."""
+    status = action("getvalueforkey", WFInput=attachment(output(post, "Contents of URL")),
+                    WFDictionaryKey="status", WFGetDictionaryValueType="Value")
+    group = str(uuid.uuid4()).upper()
+    return [
+        status,
+        action("conditional", GroupingIdentifier=group, WFControlFlowMode=0, WFCondition=4,
+               WFConditionalActionString="queued",
+               WFInput={"Type": "Variable",
+                        "Variable": attachment(output(status, "Dictionary Value", "WFStringContentItem"))}),
+        action("notification", WFNotificationActionBody=text(ok_message)),
+        action("conditional", GroupingIdentifier=group, WFControlFlowMode=1),
+        action("notification", WFNotificationActionBody=text("✗ Couldn't send: ", output(post, "Contents of URL"))),
+        action("conditional", GroupingIdentifier=group, WFControlFlowMode=2),
+    ]
+
+
 def build() -> dict:
     supabase = action("gettext", WFTextActionText=text("https://<project>.supabase.co"))
     key = action("gettext", WFTextActionText=text("sb_publishable_..."))
     token = action("gettext", WFTextActionText=text("<capture token>"))
-    # "Get URLs from" reads a text field; a bare variable there is ignored and yields no URL
-    urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
-    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    # What was shared: images if it's a screenshot or photo (their count decides the
+    # branch below), else a URL or text. "Get … from" reads a text field, so the
+    # input is wrapped the way the working URL detection already is.
+    images = action("detect.images", WFInput=text({"Type": "ExtensionInput"}))
+    imgcount = action("count", WFInput=attachment(output(images, "Images")), WFCountType="Items")
     # One tap says what the capture is for; the worker reads it as "intent: …".
     intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"])
     intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
@@ -77,32 +99,49 @@ def build() -> dict:
     # A separate action: "Ask Each Time" inside the JSON body makes Shortcuts ask
     # for the whole dictionary instead of the note alone.
     note = action("ask", WFAskActionPrompt="What do you want from this? For Idea to grow, the thought it gave you (optional)", WFInputType="Text")
-    post = action(
+
+    def note_body():  # rebuilt per branch: it references the intent and note outputs
+        return text("intent: ", output(intent, "Chosen Item"), " — ", output(note, "Provided Input"))
+
+    def headers():  # Supabase reads Authorization as a JWT, so the token travels in the body
+        return dictionary(apikey=text(output(key, "Text")))
+
+    # URL branch: the first URL in the shared link or text.
+    urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
+    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    post_url = action(
         "downloadurl",
         WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
-        WFHTTPMethod="POST",
-        ShowHeaders=True,
-        # Supabase reads Authorization as a JWT, so the token travels in the body
-        WFHTTPHeaders=dictionary(apikey=text(output(key, "Text"))),
-        WFHTTPBodyType="JSON",
-        WFJSONValues=dictionary(url=text(output(first, "Item from List")),
-                                note=text("intent: ", output(intent, "Chosen Item"), " — ",
-                                          output(note, "Provided Input")),
+        WFHTTPMethod="POST", ShowHeaders=True, WFHTTPHeaders=headers(), WFHTTPBodyType="JSON",
+        WFJSONValues=dictionary(url=text(output(first, "Item from List")), note=note_body(),
                                 token=text(output(token, "Text"))),
     )
-    status = action("getvalueforkey", WFInput=attachment(output(post, "Contents of URL")),
-                    WFDictionaryKey="status", WFGetDictionaryValueType="Value")
-    group = str(uuid.uuid4()).upper()
+
+    # Image branch: the first shared image, converted to JPEG and base64-encoded.
+    firstimg = action("getitemfromlist", WFInput=attachment(output(images, "Images")), WFItemSpecifier="First Item")
+    jpg = action("image.convert", WFInput=attachment(output(firstimg, "Item from List")),
+                 WFImageFormat="JPEG", WFImageCompressionQuality=0.8)
+    b64 = action("base64encode", WFInput=attachment(output(jpg, "Converted Image")), WFEncodeMode="Encode")
+    post_img = action(
+        "downloadurl",
+        WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture_image"),
+        WFHTTPMethod="POST", ShowHeaders=True, WFHTTPHeaders=headers(), WFHTTPBodyType="JSON",
+        WFJSONValues=dictionary(image=text(output(b64, "Base64 Encoded")), mime=text("image/jpeg"),
+                                note=note_body(), token=text(output(token, "Text"))),
+    )
+
+    outer = str(uuid.uuid4()).upper()
     actions = [
-        supabase, key, token, urls, first, intents, intent, note, post, status,
-        action("conditional", GroupingIdentifier=group, WFControlFlowMode=0, WFCondition=4,
-               WFConditionalActionString="queued",
+        supabase, key, token, images, imgcount, intents, intent, note,
+        # If no image was shared (count is 0) it's a URL or text; otherwise an image.
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=0, WFCondition=4,
+               WFConditionalActionString="0",
                WFInput={"Type": "Variable",
-                        "Variable": attachment(output(status, "Dictionary Value", "WFStringContentItem"))}),
-        action("notification", WFNotificationActionBody=text("✓ Sent to second-brain")),
-        action("conditional", GroupingIdentifier=group, WFControlFlowMode=1),
-        action("notification", WFNotificationActionBody=text("✗ Couldn't send: ", output(post, "Contents of URL"))),
-        action("conditional", GroupingIdentifier=group, WFControlFlowMode=2),
+                        "Variable": attachment(output(imgcount, "Count", "WFStringContentItem"))}),
+        urls, first, post_url, *status_block(post_url, "✓ Sent to second-brain"),
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=1),  # Otherwise: a shared image
+        firstimg, jpg, b64, post_img, *status_block(post_img, "✓ Image sent to second-brain"),
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=2),
     ]
     questions = [
         ("https://<project>.supabase.co", "Your Supabase project URL, like https://abcd1234.supabase.co"),
@@ -115,7 +154,8 @@ def build() -> dict:
         "WFWorkflowMinimumClientVersionString": "900",
         "WFWorkflowIcon": {"WFWorkflowIconStartColor": 4282601983, "WFWorkflowIconGlyphNumber": 59511},
         "WFWorkflowTypes": ["ActionExtension"],  # the share sheet, on iPhone and Mac
-        "WFWorkflowInputContentItemClasses": ["WFURLContentItem", "WFStringContentItem"],  # LinkedIn shares text
+        # LinkedIn shares text; a screenshot or photo shares an image
+        "WFWorkflowInputContentItemClasses": ["WFURLContentItem", "WFStringContentItem", "WFImageContentItem"],
         "WFWorkflowHasShortcutInputVariables": True,
         "WFWorkflowOutputContentItemClasses": [],
         "WFQuickActionSurfaces": [],

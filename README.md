@@ -275,19 +275,30 @@ then for an optional note. Both reach the worker as `intent: … — note`: the 
 steers the category and the note goes into the analysis. **Idea to grow** also
 plants the note in [hypar](#hypar).
 
+It also takes an **image**: share a screenshot or photo (no link needed) and it
+converts it to JPEG, base64-encodes it and sends it to `capture_image` instead of
+the first URL. The worker files it like any other capture, keyed by its content
+hash so the same image isn't saved twice.
+
 **To build it by hand,** or to use the local inbox instead of Supabase:
 
-1. New shortcut → ⓘ → **Show in Share Sheet**. Receive **URLs** and **Text**
-   (the LinkedIn app shares text, not a URL); if there's no input, **Stop**.
-2. **Get URLs from Input** (Shortcut Input) → **Get Item from List**: First Item.
-3. **Get Contents of URL**, method `POST`, JSON body with `url` = *Item from
-   List* and `note` = *Ask Each Time*:
+1. New shortcut → ⓘ → **Show in Share Sheet**. Receive **URLs**, **Text** (the
+   LinkedIn app shares text, not a URL) and **Images**; if there's no input, **Stop**.
+2. **Get Images from Input** → **Count** them. **If** the count **is** `0` it's a
+   link or text (step 3); **Otherwise** it's an image (step 4).
+3. *Link/text:* **Get URLs from Input** → **Get Item from List** (First Item) →
+   **Get Contents of URL**, `POST`, JSON body `url` = *Item from List*,
+   `note` = *Ask Each Time*:
    - with Supabase: `https://<project>.supabase.co/rest/v1/rpc/capture`, header
      `apikey: <SUPABASE_KEY>` and a third field `token` = `<INBOX_TOKEN>`
      (Supabase reads `Authorization` as a JWT, so the token goes in the body);
    - with the local inbox: `http://<mac>.local:8000/capture` and header
      `Authorization: Bearer <INBOX_TOKEN>`.
-4. **Get Dictionary Value** `status` from *Contents of URL*, with the variable
+4. *Image:* **Get Item from List** (First Item) from the images → **Convert Image**
+   to **JPEG** → **Base64 Encode** → **Get Contents of URL**, `POST`, to
+   `.../rpc/capture_image` (or `.../capture_image` on the local inbox), JSON body
+   `image` = the base64, `mime` = `image/jpeg`, `note` and `token` as above.
+5. **Get Dictionary Value** `status` from *Contents of URL*, with the variable
    type set to **Text**. **If** it **is** `queued` → **Show Notification** "✓ Sent
    to second-brain"; **Otherwise** → "✗ Couldn't send: *Contents of URL*".
 
