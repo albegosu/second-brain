@@ -87,11 +87,12 @@ def build() -> dict:
     supabase = action("gettext", WFTextActionText=text("https://<project>.supabase.co"))
     key = action("gettext", WFTextActionText=text("sb_publishable_..."))
     token = action("gettext", WFTextActionText=text("<capture token>"))
-    # What was shared: images if it's a screenshot or photo (their count decides the
-    # branch below), else a URL or text. "Get … from" reads a text field, so the
-    # input is wrapped the way the working URL detection already is.
-    images = action("detect.images", WFInput=text({"Type": "ExtensionInput"}))
-    imgcount = action("count", WFInput=attachment(output(images, "Images")), WFCountType="Items")
+    # The branch is decided by whether a URL was shared: a link or text yields one,
+    # a screenshot or photo yields none. detect.link reads a text field, the way the
+    # working version already relies on; the image itself comes straight from the
+    # shared input, so nothing depends on detecting images from a text field.
+    urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
+    urlcount = action("count", WFInput=attachment(output(urls, "URLs")), WFCountType="Items")
     # One tap says what the capture is for; the worker reads it as "intent: …".
     intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"])
     intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
@@ -106,19 +107,8 @@ def build() -> dict:
     def headers():  # Supabase reads Authorization as a JWT, so the token travels in the body
         return dictionary(apikey=text(output(key, "Text")))
 
-    # URL branch: the first URL in the shared link or text.
-    urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
-    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
-    post_url = action(
-        "downloadurl",
-        WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
-        WFHTTPMethod="POST", ShowHeaders=True, WFHTTPHeaders=headers(), WFHTTPBodyType="JSON",
-        WFJSONValues=dictionary(url=text(output(first, "Item from List")), note=note_body(),
-                                token=text(output(token, "Text"))),
-    )
-
-    # Image branch: the first shared image, converted to JPEG and base64-encoded.
-    firstimg = action("getitemfromlist", WFInput=attachment(output(images, "Images")), WFItemSpecifier="First Item")
+    # Image branch: the first shared item is the image; convert it to JPEG and base64.
+    firstimg = action("getitemfromlist", WFInput=attachment({"Type": "ExtensionInput"}), WFItemSpecifier="First Item")
     jpg = action("image.convert", WFInput=attachment(output(firstimg, "Item from List")),
                  WFImageFormat="JPEG", WFImageCompressionQuality=0.8)
     b64 = action("base64encode", WFInput=attachment(output(jpg, "Converted Image")), WFEncodeMode="Encode")
@@ -130,17 +120,27 @@ def build() -> dict:
                                 note=note_body(), token=text(output(token, "Text"))),
     )
 
+    # URL branch: the first URL in the shared link or text.
+    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    post_url = action(
+        "downloadurl",
+        WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
+        WFHTTPMethod="POST", ShowHeaders=True, WFHTTPHeaders=headers(), WFHTTPBodyType="JSON",
+        WFJSONValues=dictionary(url=text(output(first, "Item from List")), note=note_body(),
+                                token=text(output(token, "Text"))),
+    )
+
     outer = str(uuid.uuid4()).upper()
     actions = [
-        supabase, key, token, images, imgcount, intents, intent, note,
-        # If no image was shared (count is 0) it's a URL or text; otherwise an image.
+        supabase, key, token, urls, urlcount, intents, intent, note,
+        # If no URL was shared (count is 0) it's a screenshot or photo; otherwise a link/text.
         action("conditional", GroupingIdentifier=outer, WFControlFlowMode=0, WFCondition=4,
                WFConditionalActionString="0",
                WFInput={"Type": "Variable",
-                        "Variable": attachment(output(imgcount, "Count", "WFStringContentItem"))}),
-        urls, first, post_url, *status_block(post_url, "✓ Sent to second-brain"),
-        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=1),  # Otherwise: a shared image
+                        "Variable": attachment(output(urlcount, "Count", "WFStringContentItem"))}),
         firstimg, jpg, b64, post_img, *status_block(post_img, "✓ Image sent to second-brain"),
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=1),  # Otherwise: a link or text
+        first, post_url, *status_block(post_url, "✓ Sent to second-brain"),
         action("conditional", GroupingIdentifier=outer, WFControlFlowMode=2),
     ]
     questions = [
