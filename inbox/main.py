@@ -31,12 +31,28 @@ def db():
 def init():
     Path(DB).parent.mkdir(parents=True, exist_ok=True)
     with closing(db()) as c:
+        # url is nullable: an image capture has no URL, only its bytes. SQLite
+        # treats each NULL as distinct, so UNIQUE still dedups real URLs.
         c.execute("""CREATE TABLE IF NOT EXISTS inbox (
             id INTEGER PRIMARY KEY,
-            url TEXT NOT NULL UNIQUE,
+            url TEXT UNIQUE,
             note TEXT,
+            mime TEXT,
+            image TEXT,
             claimed_at TEXT,
             created_at TEXT NOT NULL)""")
+        info = {r["name"]: r["notnull"] for r in c.execute("PRAGMA table_info(inbox)")}
+        for col in ("mime", "image"):  # older DBs predate image captures
+            if col not in info:
+                c.execute(f"ALTER TABLE inbox ADD COLUMN {col} TEXT")
+        if info.get("url") == 1:  # old schema: url NOT NULL rejects image rows, so rebuild
+            c.executescript(
+                "ALTER TABLE inbox RENAME TO inbox_old;"
+                "CREATE TABLE inbox (id INTEGER PRIMARY KEY, url TEXT UNIQUE, note TEXT,"
+                " mime TEXT, image TEXT, claimed_at TEXT, created_at TEXT NOT NULL);"
+                "INSERT INTO inbox (id, url, note, claimed_at, created_at)"
+                " SELECT id, url, note, claimed_at, created_at FROM inbox_old;"
+                "DROP TABLE inbox_old;")
         c.commit()
 
 
@@ -47,6 +63,12 @@ def auth(header: str | None):
 
 class Capture(BaseModel):
     url: HttpUrl
+    note: str | None = None
+
+
+class CaptureImage(BaseModel):
+    image: str  # base64
+    mime: str
     note: str | None = None
 
 
@@ -68,15 +90,40 @@ def capture(body: Capture, authorization: str = Header(None)):
     return {"status": "queued"}
 
 
+@app.post("/capture_image", status_code=202)
+def capture_image(body: CaptureImage, authorization: str = Header(None)):
+    """A shared image (a screenshot or photo), base64. Not deduped here: the
+    worker keys it by its content hash and won't file the same image twice."""
+    auth(authorization)
+    with closing(db()) as c:
+        c.execute(
+            "INSERT INTO inbox (mime, image, note, created_at) VALUES (?,?,?,?)",
+            (body.mime, body.image, body.note, datetime.now(timezone.utc).isoformat()),
+        )
+        c.commit()
+    return {"status": "queued"}
+
+
 @app.get("/pending")
 def pending(authorization: str = Header(None)):
-    """The worker polls here."""
+    """The worker polls here. The image itself stays out of the list (see /image)."""
     auth(authorization)
     with closing(db()) as c:
         rows = c.execute(
-            "SELECT id, url, note FROM inbox WHERE claimed_at IS NULL ORDER BY id LIMIT 20"
+            "SELECT id, url, note, mime FROM inbox WHERE claimed_at IS NULL ORDER BY id LIMIT 20"
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+@app.get("/image/{item_id}")
+def image(item_id: int, authorization: str = Header(None)):
+    """The base64 image of one row, fetched only for the capture being filed."""
+    auth(authorization)
+    with closing(db()) as c:
+        row = c.execute("SELECT image FROM inbox WHERE id = ?", (item_id,)).fetchone()
+    if not row or row["image"] is None:
+        raise HTTPException(404, "no image")
+    return {"image": row["image"]}
 
 
 @app.post("/claim/{item_id}")

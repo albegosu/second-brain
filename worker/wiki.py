@@ -206,6 +206,13 @@ def capture_number(rel: str) -> int:
     return int(name.split("-", 1)[0]) if name.split("-", 1)[0].isdigit() else 0
 
 
+def shown_url(meta: dict) -> str:
+    """The URL to display for a source. A bare image is identified by a content
+    hash, not a link, so it shows nothing."""
+    url = str(meta.get("url") or "")
+    return "" if url.startswith(p.IMAGE_SCHEME) else url
+
+
 def find_source(url: str) -> tuple[int, dict] | None:
     """The note of an already filed URL. The wiki is the capture registry: there
     is no other database recording what was processed."""
@@ -256,7 +263,7 @@ def write_topic(path: Path, meta: dict, body: str):
         src = WIKI / rel
         m = read_page(src)[0] if src.exists() else {}
         shot = f" · [frames](../{rel.removesuffix('.md')}.jpg)" if src.with_suffix(".jpg").exists() else ""
-        lines.append(f"{i}. [{m.get('title', rel)}](../{rel}) — {m.get('url', '')}{shot}")
+        lines.append(f"{i}. [{m.get('title', rel)}](../{rel}) — {shown_url(m)}{shot}")
     write_page(path, meta, "\n".join(lines))
 
 
@@ -418,7 +425,7 @@ def links(meta: dict, body: str) -> list[str]:
     """The outside URLs a source note contains, for tools' Link lines. Found by
     code so the model can only pick among real ones."""
     found = [u.rstrip(".,;:!?*") for u in URL.findall(body)]
-    if meta.get("source") not in ("x", "instagram", "linkedin"):  # a page or repository is itself the link
+    if meta.get("source") not in ("x", "instagram", "linkedin", "image"):  # a page or repository is itself the link
         found.insert(0, str(meta.get("url") or ""))
     return list(dict.fromkeys(u for u in found if u and not POST_HOSTS.match(u)))[:12]
 
@@ -433,7 +440,7 @@ def compose(key: str, meta: dict) -> str:
         src_body = re.sub(r"^!\[[^\]]*\]\([^)]*\.jpg\)\n+", "", src_body, flags=re.M)
         looks += "## Visual style" in src_body and "## What it shows" not in src_body
         found = links(src_meta, src_body)
-        notes.append((f"[{i}] {src_meta.get('title', rel)} — {src_meta.get('url', '')}\n"
+        notes.append((f"[{i}] {src_meta.get('title', rel)} — {shown_url(src_meta)}\n"
                       f"{src_meta.get('summary', '')}" + (f"\nLinks: {', '.join(found)}" if found else ""),
                       src_body))
     category, slug = key.split("/")
@@ -469,7 +476,9 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
     body = source_body(note=note, text=media.get("text"), page=media.get("page"),
                        patterns=patterns, style=style, ideas=ideas or [],
                        long_text=bool(media.get("article")))
-    header = f"URL: {url}\nFrom: {source}" + (f" · @{media['author']}" if media.get("author") else "")
+    is_image = source == "image"  # a bare screenshot or photo, identified by a content hash
+    header = ("From: image capture" if is_image else f"URL: {url}\nFrom: {source}") \
+        + (f" · @{media['author']}" if media.get("author") else "")
 
     detach(cid)
     known = topics()
@@ -488,7 +497,7 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
     key = f"{category}/{slug}"
 
     title = str(cls.get("title") or (patterns[0].get("title") if patterns and isinstance(patterns[0], dict) else "")
-                or url)
+                or ("Image capture" if is_image else url))
     summary = str(cls.get("summary") or "")
     tags = [slugify(str(t)) for t in (cls.get("tags") or []) if str(t).strip()][:6]
 
@@ -510,7 +519,8 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                 "author": media.get("author"), "captured": captured,
                 "topic": key, "tags": tags, "capture": cid, "note": note, "analyzed": ANALYZED},
                f"# {title}\n\n{summary}\n\n"
-               f"Filed under [{meta['title']}](../../{key}.md) · [original]({url})\n\n{shown}{body}")
+               f"Filed under [{meta['title']}](../../{key}.md)"
+               f"{'' if is_image else f' · [original]({url})'}\n\n{shown}{body}")
 
     meta["sources"] = sorted({*meta.get("sources", []), rel}, key=capture_number)
     meta["updated"] = date.today().isoformat()
