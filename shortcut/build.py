@@ -87,12 +87,17 @@ def build() -> dict:
     supabase = action("gettext", WFTextActionText=text("https://<project>.supabase.co"))
     key = action("gettext", WFTextActionText=text("sb_publishable_..."))
     token = action("gettext", WFTextActionText=text("<capture token>"))
-    # The branch is decided by whether a URL was shared: a link or text yields one,
-    # a screenshot or photo yields none. detect.link reads a text field, the way the
-    # working version already relies on; the image itself comes straight from the
-    # shared input, so nothing depends on detecting images from a text field.
+    # detect.link extracts the URL from a shared link (Safari, Chrome or an app that
+    # shares text). Its first item decides the branch: a URL means a link/text was
+    # shared, an empty value means a screenshot or photo. (count returned 0 even on a
+    # non-empty list, so the branch tests the first URL directly instead.)
     urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
-    urlcount = action("count", WFInput=attachment(output(urls, "URLs")), WFCountType="Items")
+    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    # Comparing the first URL to an empty string is unreliable (an empty list item
+    # doesn't test equal to ""), so append a sentinel: an empty first yields exactly
+    # the sentinel (a photo), a URL yields url+sentinel (a link), and both compare
+    # with the plain "Is" test that the status check already uses.
+    marker = action("gettext", WFTextActionText=text(output(first, "Item from List"), "SBNOURL"))
     # One tap says what the capture is for; the worker reads it as "intent: …".
     intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"])
     intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
@@ -120,8 +125,7 @@ def build() -> dict:
                                 note=note_body(), token=text(output(token, "Text"))),
     )
 
-    # URL branch: the first URL in the shared link or text.
-    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    # URL branch: the shared URL (already resolved as `first`).
     post_url = action(
         "downloadurl",
         WFURL=text(output(supabase, "Text"), "/rest/v1/rpc/capture"),
@@ -132,15 +136,16 @@ def build() -> dict:
 
     outer = str(uuid.uuid4()).upper()
     actions = [
-        supabase, key, token, urls, urlcount, intents, intent, note,
-        # If no URL was shared (count is 0) it's a screenshot or photo; otherwise a link/text.
+        supabase, key, token, urls, first, marker, intents, intent, note,
+        # marker is just the sentinel when no URL was shared (a screenshot or photo);
+        # otherwise it's the URL followed by the sentinel (a link or text).
         action("conditional", GroupingIdentifier=outer, WFControlFlowMode=0, WFCondition=4,
-               WFConditionalActionString="0",
+               WFConditionalActionString="SBNOURL",
                WFInput={"Type": "Variable",
-                        "Variable": attachment(output(urlcount, "Count", "WFStringContentItem"))}),
+                        "Variable": attachment(output(marker, "Text", "WFStringContentItem"))}),
         firstimg, jpg, b64, post_img, *status_block(post_img, "✓ Image sent to second-brain"),
         action("conditional", GroupingIdentifier=outer, WFControlFlowMode=1),  # Otherwise: a link or text
-        first, post_url, *status_block(post_url, "✓ Sent to second-brain"),
+        post_url, *status_block(post_url, "✓ Sent to second-brain"),
         action("conditional", GroupingIdentifier=outer, WFControlFlowMode=2),
     ]
     questions = [
