@@ -36,6 +36,14 @@ python -m worker.lint --dry-run
 You don't need Supabase or a wiki repository to work on extraction, prompts or
 the wiki structure: `--url` skips the inbox.
 
+Tests run on a synthetic wiki (`tests/fixtures/sample-wiki`, invented captures)
+with the standard library, no model and no network:
+
+```bash
+python -m unittest discover tests
+DESIGN_MD_LINT=1 python -m unittest discover tests   # also the DESIGN.md spec linter (npx)
+```
+
 ## How the code is organized
 
 - `worker/pipeline.py`: fetching (per-source handlers), keyframes, palette,
@@ -45,6 +53,9 @@ the wiki structure: `--url` skips the inbox.
   that way, so a bad model answer can spoil a text but never the navigation.
 - `worker/lint.py`: the weekly reorganization. The model proposes, the code
   validates; every source note must stay in exactly one topic.
+- `worker/taste.py` and `worker/design_md.py`: the taste profile and its
+  DESIGN.md, or a style topic's. Code counts and derives every token; the model
+  only writes prose.
 - `worker/run.py`: inbox polling, ingestion, commits, notifications.
 - `db/supabase.sql`: the inbox schema and functions.
 - `templates/wiki-repo/`: what a user's private wiki repository starts from.

@@ -1,6 +1,6 @@
 ---
 name: second-brain
-description: The user's personal knowledge base, kept as a Markdown wiki of things they saved from X, Instagram, LinkedIn and the web. It has four categories. design covers UI patterns, interactions, motion and visual styles. features covers product functionality worth building. tools covers apps, libraries and services. practices covers how to work: engineering practices, workflows with AI agents and lessons from articles. Check it BEFORE designing or implementing a UI component, animation, interaction or product feature, before choosing a tool or library, and when deciding how to approach agent or engineering work, in case there is a saved reference. Also use it when asked "¿tengo algo guardado sobre…?", "busca en mi second brain", "what did I save about…", "hazlo con el estilo X", or for inspiration.
+description: The user's personal knowledge base, kept as a Markdown wiki of things they saved from X, Instagram, LinkedIn and the web. It has four categories. design covers UI patterns, interactions, motion and visual styles. features covers product functionality worth building. tools covers apps, libraries and services. practices covers how to work: engineering practices, workflows with AI agents and lessons from articles. It also turns the user's taste, or one saved style, into a DESIGN.md to build UI from. Check it BEFORE designing or implementing a UI component, animation, interaction or product feature, before choosing a tool or library, and when deciding how to approach agent or engineering work, in case there is a saved reference. Also use it when asked "¿tengo algo guardado sobre…?", "busca en mi second brain", "what did I save about…", "hazlo con el estilo X", or for inspiration.
 ---
 
 # Second brain
@@ -18,7 +18,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 1. Read `wiki/index.md` first. For every topic it lists a one-line summary, the blocks the page holds (patterns, styles, options or ideas) and how often it was used in a build, plus the latest captures. Match on block names, not only topic titles. Don't read whole folders.
 2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed, one `### <name> [n]` block per item:
    - `## Patterns` (design, features): **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
-   - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. Apply it like a DESIGN.md.
+   - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. To build with one, generate its DESIGN.md (see "When building from it").
    - `## Options` (tools): **What it does**, **Use it when**, **Link** (only URLs found in the sources) and **Notes**.
    - `## Ideas` (practices): **Claim**, **Why it matters**, **How to apply**, **Watch out**.
    - `## Choosing`: which one fits which situation, when there are several.
@@ -34,7 +34,12 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 
 ## When building from it
 
-- Designing something with no style given, neither by the user nor by the project's design system? Read `wiki/taste.md` first and start from its default look and motion. Each line there cites the counts it rests on; treat "Not enough evidence" as questions to ask. An explicit request or the project's own tokens always win over it.
+- Designing something with no style given, neither by the user nor by the project's design system? Start from `wiki/DESIGN.md` (the weekly lint pass writes it; until then, `wiki/taste.md`): the same taste as `wiki/taste.md`, written as a [DESIGN.md](https://github.com/google-labs-code/design.md) (color roles, type scale, radius, spacing and components as tokens, then rules). Follow its tokens rather than inventing values; code derived them from measured palettes and already checked text contrast (4.5:1). `wiki/taste.md` has the counts behind them; treat anything marked "no clear lead" or "Not enough evidence" as a question to ask. An explicit request or the project's own tokens always win over both.
+- Building with a saved style ("hazlo con el estilo X", or a `style-*` topic fits the task)? Generate that topic's DESIGN.md and build from it, then look at the topic's frames: the tokens set colors and scales, the image shows the composition.
+  ```bash
+  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.design_md --style <slug> --out <project>/DESIGN.md
+  ```
+  The slug is the topic's file name (`style-editorial`, or just `editorial`); without `--out` it prints. A topic with several looks gives its dominant one and names the others. A model writes only the overview and rules; `--no-model` skips it (a template writes them) when Ollama isn't reachable. The file carries capture numbers for the usage log but no links or post text; it is still derived from private captures, so ask before committing it to a public repository, and never overwrite a DESIGN.md the project already has.
 - Steps, animated properties and easing come from a vision model looking at frames. They are good starting points. Durations are usually omitted on purpose, because they cannot be measured from stills.
 - Palettes in source notes are measured from pixels but include the demo's content colors. Pick the UI ones.
 - Adapt to the project's own design tokens and stack. The wiki never stores code.
@@ -53,5 +58,5 @@ cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRA
 
 - Put `style: <name>` in the note to file the capture under the design topic `style-<name>`.
 - Topic pages are rewritten from their source notes whenever a capture arrives or the weekly lint pass reorganizes topics, so manual edits to a topic page don't last. Put lasting context in the capture's note instead.
-- `wiki/index.md`, `wiki/taste.md` and `wiki/usage.md` are written by code, so never edit them by hand.
+- `wiki/index.md`, `wiki/taste.md`, `wiki/DESIGN.md` and `wiki/usage.md` are written by code, so never edit them by hand.
 - Don't commit wiki changes: the worker commits and pushes them to the wiki repository. Engine code changes (`~/Developer/second-brain` by default) are the user's to commit.

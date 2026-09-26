@@ -26,7 +26,8 @@ shape what their AI assistant builds instead of rotting in a bookmarks folder.
    committed to a private wiki repository, apart from the engine.
 5. **Notify** the phone with where it was filed.
 6. **Use.** The `second-brain` skill reads the index, opens only the relevant
-   topics and cites the sources while Claude designs or builds.
+   topics and cites the sources while Claude designs or builds. Your taste, or
+   any saved style, comes out as a DESIGN.md it builds from.
 
 ## What makes it different
 
@@ -56,7 +57,12 @@ agent memory tools), none of them did the following. This is the product.
 6. **Design, features and tools in one place.** Inspiration tools only keep
    visuals; reading tools only keep text. A UI animation, a product behavior worth
    copying and a library to try all land in the same wiki.
-7. **Capture without an app, processing without a computer, at zero cost.** A
+7. **Your own DESIGN.md.** Collections such as getdesign.md give an agent a
+   brand's DESIGN.md (Stripe's, Linear's). second-brain turns what you saved into
+   yours: the taste across every capture, or one style, with tokens derived by
+   code from measured palettes and traits. getdesign.md gives you Stripe's
+   DESIGN.md; second-brain gives you yours.
+8. **Capture without an app, processing without a computer, at zero cost.** A
    system Shortcut on iOS and macOS, a free Supabase inbox, GitHub Actions and the
    Ollama Cloud free plan. Nothing to install on the phone and nothing that needs
    your laptop to be on.
@@ -95,5 +101,6 @@ agent memory tools), none of them did the following. This is the product.
 | Readwise Reader | Reading and highlights with an official MCP | Text only |
 | Stele | Captures real web UI as code and tokens, with MCP | Web pages only, not social video |
 | Mobbin MCP, Refero | Curated app screens and design systems for agents | Someone else's references, not yours |
+| getdesign.md and other DESIGN.md collections | Ready DESIGN.md files of known brands for coding agents | A brand's taste, not yours |
 | Obsidian Web Clipper | LLM-powered clipping into a Markdown vault | You design and maintain the organization |
 | Karpathy's LLM wiki | The same raw sources → compiled wiki → index pattern | A pattern, not a capture pipeline |
