@@ -266,13 +266,13 @@ def looks(files: list[Path] | None = None) -> list[dict]:
     return sorted(out, key=lambda look: look["capture"])
 
 
-def choose(counts: Counter, fallback: str | None = None) -> tuple[str | None, str]:
+def choose(counts: Counter, fallback: str | None = None, key: str | None = None) -> tuple[str | None, str]:
     """The value to use and why, in taste.md's terms: its lead when there is one,
     otherwise the most frequent, said so."""
     total = sum(counts.values())
-    if value := taste.lead(counts):
+    if value := taste.lead(counts, key):
         return value, f"lead: {value} {counts[value]} of {total}"
-    top = [(v, n) for v, n in counts.most_common() if v not in ("other", "none")]
+    top = [(v, n) for v, n in counts.most_common() if v not in taste.skipped(key)]
     if top:
         return top[0][0], "no clear lead: " + " · ".join(f"{v} {n}" for v, n in top[:3])
     return fallback, "no evidence, a neutral default"
@@ -306,7 +306,7 @@ def taste_design() -> dict | None:
         return None
     c = ev["counts"]
     traits = {"typography": choose(c["typography"])}
-    traits.update({k: choose(c[k], DEFAULTS[k]) for k in ("radius", "spacing", "depth", "motion_feel")})
+    traits.update({k: choose(c[k], DEFAULTS[k], k) for k in ("radius", "spacing", "depth", "motion_feel")})
 
     mine = [look for look in looks() if look["category"] in taste.LOOK_CATEGORIES and look["neutrals"]]
     tone, tone_why = choose(c["background"])
