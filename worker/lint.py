@@ -8,8 +8,8 @@
 The model proposes merging duplicate topics, splitting catch-all topics, moving
 misfiled captures and relating topics. The code validates the plan (every source
 note ends up in exactly one topic, nothing is dropped) and applies only what
-passes. It then refreshes the taste profile (worker/taste.py). Runs weekly on
-GitHub Actions (.github/workflows/lint.yml).
+passes. It then refreshes the taste profile (worker/taste.py) and its DESIGN.md
+(worker/design_md.py). Runs weekly on GitHub Actions (.github/workflows/lint.yml).
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ import re
 import sys
 from datetime import date
 
+from . import design_md
 from . import hypar
 from . import pipeline as p
 from . import run
@@ -234,12 +235,18 @@ def main():
     except Exception as e:  # the profile is a bonus: never lose the lint pass over it
         print(f"[lint] taste profile not refreshed: {e}", file=sys.stderr)
         refreshed = False
-    if refreshed:
+    try:
+        designed = design_md.build()
+    except Exception as e:  # so is its DESIGN.md
+        print(f"[lint] DESIGN.md not refreshed: {e}", file=sys.stderr)
+        designed = False
+    if refreshed or designed:
         wiki.build_index()
-    if log or rewritten or refreshed:
+    if log or rewritten or refreshed or designed:
         run.commit_wiki("docs(wiki): lint pass",
                         "\n".join([*log, *(f"rewrote {k}" for k in rewritten), *(f"note: {n}" for n in notes),
-                                    *(["refreshed taste profile"] if refreshed else [])]))
+                                    *(["refreshed taste profile"] if refreshed else []),
+                                    *(["refreshed DESIGN.md"] if designed else [])]))
         hypar.sync_index(wiki.WIKI)
 
 
