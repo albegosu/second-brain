@@ -147,10 +147,16 @@ def evidence() -> dict:
     return {"captures": captures, "looks": looks, "counts": c, "notes": notes}
 
 
-def lead(counts: Counter) -> str | None:
+def skipped(key: str | None = None) -> tuple[str, ...]:
+    """Values that aren't a choice. "other" never is; "none" is for the radius
+    (square corners), but for anything else it means nothing was seen."""
+    return ("other",) if key == "radius" else ("other", "none")
+
+
+def lead(counts: Counter, key: str | None = None) -> str | None:
     """The value that clearly leads: at least 3 captures, a third of the total and
     half again as many as the runner-up."""
-    counts = Counter({v: n for v, n in counts.items() if v not in ("other", "none")})  # not a choice
+    counts = Counter({v: n for v, n in counts.items() if v not in skipped(key)})
     top = counts.most_common(2)
     if not top:
         return None
@@ -171,7 +177,7 @@ def evidence_lines(ev: dict, verdict: bool = False) -> list[str]:
             line = f"- **{label}:** " + " · ".join(f"{v} {n}" for v, n in counts)
             if verdict and key != "category":
                 line += f" (of {sum(ev['counts'][key].values())}; " + (
-                    f"lead: {v})" if (v := lead(ev["counts"][key])) else "no clear lead)")
+                    f"lead: {v})" if (v := lead(ev["counts"][key], key)) else "no clear lead)")
             lines.append(line)
     return lines
 

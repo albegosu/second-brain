@@ -17,11 +17,13 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 from unittest import mock
 
 from worker import design_md as dm
 from worker import pipeline as p
+from worker import taste
 from worker import wiki
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +61,12 @@ class DesignMdTest(unittest.TestCase):
         self.assertEqual(dm.readable("#141216", ["#ffffff"]), "#141216")  # already fine: untouched
 
     # ------------------------------------------------------------ taste
+
+    def test_square_corners_can_lead(self):
+        # "none" is a radius (square corners); for motion it means nothing was seen.
+        self.assertEqual(taste.lead(Counter(none=6, rounded=2), "radius"), "none")
+        self.assertIsNone(taste.lead(Counter(none=6, smooth=2), "motion_feel"))
+        self.assertEqual(dm.choose(Counter(none=6, rounded=2), "rounded", "radius")[0], "none")
 
     def test_taste_tokens_come_from_the_design_captures(self):
         d, tok, _ = self.made()

@@ -160,7 +160,7 @@ Depth is flat (lead: flat 5 of 8). No shadows: layers are told apart by the step
 
 ## Shapes
 
-Corners are barely rounded (no clear lead: subtle 3 · rounded 3): 4px on buttons and inputs, 6px on cards, 2px on chips.
+Corners are barely rounded (no clear lead: subtle 3 · rounded 3 · none 2): 4px on buttons and inputs, 6px on cards, 2px on chips.
 
 ## Components
 
