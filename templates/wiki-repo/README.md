@@ -5,8 +5,8 @@ Markdown wiki the worker writes from what you share, and the workflows that
 write it.
 
 - `wiki/`: written by the worker after each capture and by the weekly lint
-  pass. Topic pages and `index.md` are regenerated, so don't edit them by hand;
-  put lasting context in the capture's note.
+  pass. Topic pages, `index.md`, `taste.md` and `DESIGN.md` are regenerated, so
+  don't edit them by hand; put lasting context in the capture's note.
 - `.github/workflows/capture.yml`: processes the Supabase inbox.
 - `.github/workflows/lint.yml`: weekly reorganization of the wiki.
 

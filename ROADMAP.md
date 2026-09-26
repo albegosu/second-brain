@@ -51,6 +51,15 @@ is rough priority.
   named `style-*`) are written as a `## Styles` sheet with tokens (measured
   palette, type, radius, spacing, depth, motion), composition and do/don't.
   *Inspired by Refero Styles.*
+- ~~**A real `DESIGN.md` for agents.**~~ Done: `worker/design_md.py` writes the
+  taste (`wiki/DESIGN.md`, after each lint pass) or any style topic (on demand)
+  in the Google Labs [DESIGN.md](https://github.com/google-labs-code/design.md)
+  format. Code derives the tokens (color roles tuned to WCAG AA, a font per type
+  family, radius and spacing scales, components); a model only writes prose. It
+  passes the spec's linter with no errors or warnings, and the skill builds from
+  it. Still open: variants for the other looks of a topic, and a dark and light
+  pair when the taste splits between them.
+  *getdesign.md gives you Stripe's DESIGN.md; this gives you yours.*
 - ~~**Ideas from what you read.**~~ Done: a `practices` category; articles and
   long texts get their key ideas extracted, and topic pages list them with claim,
   why and how to apply.
@@ -138,6 +147,8 @@ history, and the Supabase design only stores token hashes.
 
 - **Extractor test suite** with recorded fixtures (X, Instagram, LinkedIn, plain
   pages), so platform changes show up as failing tests instead of failed captures.
+  A first suite exists (`tests/`, the DESIGN.md export on a synthetic wiki); the
+  extractors still have none, and nothing runs it on pull requests yet.
 - **Weekly digest** through ntfy: what was saved, which topics grew, what failed.
 - **Quota awareness** for the Ollama Cloud free plan: back off and retry instead
   of failing when limits are hit.

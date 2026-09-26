@@ -62,6 +62,7 @@ repository are public and print what was captured. Point `BRAIN_WIKI` at its
 wiki/
   index.md                      map of topics; written by code
   taste.md                      recurring choices across captures; weekly
+  DESIGN.md                     the same taste as design tokens; weekly
   usage.md                      what was built from which captures
   design/ features/ tools/      one page per topic
   practices/
@@ -138,6 +139,33 @@ accent hues across every capture, and the model turns those counts and your
 notes into a short default look and motion, each line citing its counts. The
 skill starts from it when nothing else sets a style. `python -m worker.taste
 --dry-run` prints the counts.
+
+**DESIGN.md.** Collections like getdesign.md give an agent a brand's
+[DESIGN.md](https://github.com/google-labs-code/design.md) (Stripe's, Linear's);
+this one is yours. After the lint pass, `wiki/DESIGN.md` holds the taste in that
+format, and any style topic gets its own on demand. The code derives every token:
+measured palettes become color roles (primary, secondary, tertiary, neutral,
+surface, on-surface, outline), with text colors darkened or lightened along their
+own hue until they reach 4.5:1; the type family category becomes an open font
+(geometric sans → DM Sans, grotesk → Inter, serif → Source Serif 4, mono →
+JetBrains Mono…, named as a default to swap); radius, spacing and depth become
+scales and components. A model writes only the overview and the do's and don'ts,
+and code drops any line with a hex code or a link; without a model a template
+writes them. A style topic with several looks gives the dominant
+one: each trait takes the value most of its captures share, and the colors come
+from the single capture that matches best, so palettes are never mixed. The file
+holds capture numbers but no links or post text.
+
+```bash
+python -m worker.design_md                                      # rewrite wiki/DESIGN.md from the taste
+python -m worker.design_md --style editorial --out app/DESIGN.md  # one style topic
+python -m worker.design_md --style editorial --dry-run          # print tokens and contrast, change nothing
+python -m worker.design_md --no-model                           # template prose, no model call
+```
+
+The output passes `npx @google/design.md lint` with no errors or warnings. What
+it looks like, from the synthetic test wiki: [taste](docs/examples/DESIGN.taste.md)
+and [a style](docs/examples/DESIGN.style-paper-ink.md).
 
 **Usage log.** When Claude builds something that takes from the wiki, the skill
 records it with `python -m worker.used <capture numbers> --project … --what …`.
