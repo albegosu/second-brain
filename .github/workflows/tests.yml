@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: unit tests + DESIGN.md spec lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same Python as the wiki's workflows (templates/wiki-repo), which run the worker.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # For npx @google/design.md lint, run by the DESIGN_MD_LINT test.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: pip install -r requirements.txt
+
+      - name: Tests
+        run: python -m unittest discover tests -v
+        env:
+          DESIGN_MD_LINT: "1"
