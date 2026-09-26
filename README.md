@@ -1,11 +1,30 @@
 # second-brain
 
+**Save UI inspiration from any app. A vision model curates it into a private wiki
+and turns your taste into a DESIGN.md your coding agent builds from.**
+
+<p align="center">
+  <img src="docs/readme/flow.svg" width="100%" alt="The flow in four steps: share a post, page, screenshot or photo from any app; a vision model reads it, measures its palette and files it into a wiki topic; the taste becomes a DESIGN.md with color, type and radius tokens; a coding agent builds a card with those tokens.">
+</p>
+
+- **Save from anywhere.** Share a post from X, Instagram or LinkedIn, any web page,
+  a screenshot or a photo, from your iPhone or Mac.
+- **Curated, not dumped.** A vision model reads the frames, measures the palette
+  from pixels and files each capture under a topic: design, features, tools or
+  practices. Code counts your recurring choices into a taste profile.
+- **Your DESIGN.md.** The taste, or any saved style, becomes a
+  [DESIGN.md](https://github.com/google-labs-code/design.md): tokens derived by
+  code, contrast-checked, lint-clean. Claude reads it through the `second-brain`
+  skill before it builds UI. getdesign.md gives you Stripe's DESIGN.md;
+  second-brain gives you yours.
+
+## How it works
+
 A memory for things worth keeping: interface patterns and styles, feature ideas
-and tools. You share a post from X, Instagram or LinkedIn, or any web page, from
-your iPhone or Mac. A model analyzes it, files it under a topic and merges it
-into a Markdown wiki kept in a separate private repository. Claude then reads it
-through the `second-brain` skill before designing or building something. This
-repository is the engine.
+and tools. You share something from your iPhone or Mac. A model analyzes it,
+files it under a topic and merges it into a Markdown wiki kept in a separate
+private repository. Claude then reads it through the `second-brain` skill before
+designing or building something. This repository is the engine.
 
 What sets it apart and where it's going: [PRODUCT.md](PRODUCT.md) ·
 [ROADMAP.md](ROADMAP.md).
@@ -165,7 +184,9 @@ python -m worker.design_md --no-model                           # template prose
 
 The output passes `npx @google/design.md lint` with no errors or warnings. What
 it looks like, from the synthetic test wiki: [taste](docs/examples/DESIGN.taste.md)
-and [a style](docs/examples/DESIGN.style-paper-ink.md).
+and [a style](docs/examples/DESIGN.style-paper-ink.md). The image at the top of this README is built
+from the same test wiki and styled with that style's DESIGN.md:
+`python docs/readme/build_flow.py`.
 
 **Usage log.** When Claude builds something that takes from the wiki, the skill
 records it with `python -m worker.used <capture numbers> --project … --what …`.
