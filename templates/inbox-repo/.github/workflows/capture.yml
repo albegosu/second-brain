@@ -1,0 +1,114 @@
+# The GitHub inbox: the capture page (and anything else holding the capture
+# token) writes one JSON file per capture into queue/. Each push runs this
+# workflow, which files what's queued into the wiki repository and removes it.
+#
+# The capture token can only write to this repository, never read the wiki: the
+# wiki is written with a deploy key kept in this repository's secrets
+# (WIKI_DEPLOY_KEY). bin/setup creates both. The 6-hour run retries anything
+# that failed for a transient reason.
+name: capture
+
+on:
+  push:
+    branches: [main]
+    paths: ["queue/**"]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+# One run at a time: capture numbers come from the wiki.
+concurrency:
+  group: capture
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the inbox
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: inbox
+
+      - name: Check out the wiki
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.WIKI_REPOSITORY }}
+          path: wiki-repo
+          ssh-key: ${{ secrets.WIKI_DEPLOY_KEY }}
+          fetch-depth: 0
+
+      - name: Check out the engine
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.ENGINE_REPOSITORY || 'albegosu/second-brain' }}
+          ref: ${{ vars.ENGINE_REF || 'main' }}
+          path: engine
+          ssh-key: ${{ secrets.ENGINE_DEPLOY_KEY }}  # only for a private engine; leave unset otherwise
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: engine/requirements.txt
+
+      - name: Install ffmpeg and dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          pip install -q -r engine/requirements.txt
+
+      # Screenshots use the runner's google-chrome. Ubuntu 24.04 blocks the user
+      # namespaces its sandbox needs; allow them rather than run it --no-sandbox.
+      - name: Let headless Chrome use its sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Process queued captures
+        working-directory: engine
+        env:
+          BRAIN_QUEUE_DIR: ${{ github.workspace }}/inbox/queue
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          HYPAR_URL: ${{ secrets.HYPAR_URL }}      # optional: plant "Idea to grow" notes in hypar
+          HYPAR_TOKEN: ${{ secrets.HYPAR_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          OLLAMA_HOST: https://ollama.com
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          BRAIN_PROVIDER: ${{ vars.BRAIN_PROVIDER }}
+          BRAIN_API_KEY: ${{ secrets.BRAIN_API_KEY }}
+          BRAIN_API_BASE: ${{ vars.BRAIN_API_BASE }}
+          BRAIN_VLM: ${{ vars.BRAIN_VLM || (vars.BRAIN_PROVIDER == '' && 'gemma4:31b' || '') }}
+          BRAIN_WIKI: ${{ github.workspace }}/wiki-repo/wiki
+          BRAIN_GIT_SYNC: "1"
+        run: |
+          git -C "$GITHUB_WORKSPACE/wiki-repo" config user.name "second-brain worker"
+          git -C "$GITHUB_WORKSPACE/wiki-repo" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python -m worker.run --once
+
+      # Remove what was filed. When the queue is empty, start the branch over
+      # from a single commit so shared images don't pile up in its history;
+      # --force-with-lease keeps a capture that arrived meanwhile.
+      - name: Empty the queue
+        if: always()
+        working-directory: inbox
+        run: |
+          git config user.name "second-brain worker"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A queue
+          git diff --cached --quiet || git commit -q -m "chore: filed queued captures"
+          for try in 1 2 3; do
+            git fetch -q origin main
+            if [ -z "$(git ls-tree --name-only origin/main queue/ | grep -v '^queue/.gitkeep$')" ] && \
+               [ -z "$(git ls-tree --name-only HEAD queue/ | grep -v '^queue/.gitkeep$')" ]; then
+              tree=$(git rev-parse HEAD^{tree})
+              fresh=$(git commit-tree "$tree" -m "chore: empty inbox")
+              git push -q --force-with-lease=main:"$(git rev-parse origin/main)" origin "$fresh":main && exit 0
+            else
+              git rebase -q origin/main && git push -q origin HEAD:main && exit 0
+            fi
+          done
+          echo "::warning::couldn't update the inbox; the next run tidies it"

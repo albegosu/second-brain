@@ -18,6 +18,7 @@ Shared as "Idea to grow", the note is also planted as an embryo in hypar.
 """
 import argparse
 import base64
+import json
 import os
 import re
 import subprocess
@@ -47,6 +48,12 @@ NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 WORKER_TOKEN = os.environ.get("WORKER_TOKEN", "")
+
+# GitHub inbox, when set: a folder of JSON files, one per capture, that the
+# capture page writes into the inbox repository through the GitHub API
+# ({"url"} or {"image", "mime"}, plus "note"). A filed capture's file is
+# deleted; the workflow commits the deletions.
+QUEUE_DIR = os.environ.get("BRAIN_QUEUE_DIR", "")
 
 # Automatic commit and push of the wiki after each capture.
 GIT_SYNC = os.environ.get("BRAIN_GIT_SYNC") == "1"
@@ -246,8 +253,34 @@ def notify(url: str, result: dict):
         print(f"[worker] ntfy unreachable: {e}", file=sys.stderr)
 
 
-def inbox(action: str, item_id: int | None = None, reason: str | None = None):
-    """pending, retry or claim, against Supabase or the local inbox."""
+def queue_inbox(action: str, item_id: str | None = None, reason: str | None = None):
+    """pending, retry or claim over the GitHub inbox's queue folder."""
+    folder = Path(QUEUE_DIR)
+    if action == "pending":
+        items = []
+        for f in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(f.read_text())
+            except (OSError, ValueError):
+                data = {}
+            items.append({"id": f.stem, "url": data.get("url"), "note": data.get("note"),
+                          "mime": data.get("mime") if data.get("image") else None,
+                          "attempts": data.get("attempts", 0)})
+        return items[:20]
+    f = folder / f"{item_id}.json"
+    if action == "claim":
+        f.unlink(missing_ok=True)
+    elif action == "retry" and f.exists():
+        data = json.loads(f.read_text())
+        data.update(attempts=int(data.get("attempts") or 0) + 1, last_error=(reason or "")[:500])
+        f.write_text(json.dumps(data))
+    return None
+
+
+def inbox(action: str, item_id: int | str | None = None, reason: str | None = None):
+    """pending, retry or claim, against the GitHub inbox, Supabase or the local inbox."""
+    if QUEUE_DIR:
+        return queue_inbox(action, item_id, reason)
     if SUPABASE_URL:
         params = {"token": WORKER_TOKEN}
         if item_id is not None:
@@ -267,10 +300,12 @@ def inbox(action: str, item_id: int | None = None, reason: str | None = None):
     return r.json()
 
 
-def fetch_inbox_image(item_id: int) -> bytes:
+def fetch_inbox_image(item_id: int | str) -> bytes:
     """The base64 image of an inbox row, decoded. Kept out of pending() so a
     poll doesn't drag every image along; fetched only for the row being filed.
     Supabase hands it over through its own RPC, the local inbox at /image/."""
+    if QUEUE_DIR:
+        return base64.b64decode(json.loads((Path(QUEUE_DIR) / f"{item_id}.json").read_text())["image"])
     if SUPABASE_URL:
         r = httpx.post(f"{SUPABASE_URL}/rest/v1/rpc/fetch_image", timeout=60,
                        json={"item_id": item_id, "token": WORKER_TOKEN},
@@ -302,6 +337,9 @@ def poll_once() -> int:
             if result is None:
                 print(f"[worker] {url} ({item['mime']})")
                 result = ingest_image(data, note)
+        elif not str(item.get("url") or "").startswith(("http://", "https://")):
+            url, result = f"queued #{item['id']}", {"text": "nothing to file: no link or image",
+                                                    "error": "no link or image"}
         else:
             url = p.canonical_url(item["url"])
             print(f"[worker] {url}")

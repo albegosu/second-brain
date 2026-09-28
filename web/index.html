@@ -58,12 +58,29 @@
   </form>
 
   <form id="settings" novalidate hidden>
-    <p>Connect this device to your inbox with the three values the Shortcut asks for; <code>bin/setup</code> prints them (and a QR code to scan with the phone). They stay in this browser.</p>
+    <p>Connect this device to your inbox: scan the QR code <code>bin/setup</code> printed, or paste its link here. The settings stay in this browser.</p>
     <label class="field">
       <span>Setup link</span>
       <input id="s-link" type="text" placeholder="Paste the link bin/setup printed" autocomplete="off" spellcheck="false">
     </label>
-    <p class="muted">Or fill in the three values:</p>
+    <fieldset class="intents">
+      <legend>Or fill in your inbox</legend>
+      <div class="options">
+        <label><input type="radio" name="kind" value="github" checked><span>GitHub</span></label>
+        <label><input type="radio" name="kind" value="supabase"><span>Supabase</span></label>
+      </div>
+    </fieldset>
+    <div class="group" id="github-fields">
+      <label class="field">
+        <span>Inbox repository</span>
+        <input id="s-repo" type="text" placeholder="you/second-brain-wiki-inbox" autocomplete="off" spellcheck="false" autocapitalize="off">
+      </label>
+      <label class="field">
+        <span>Capture token</span>
+        <input id="s-gh-token" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      </label>
+    </div>
+    <div class="group" id="supabase-fields" hidden>
     <label class="field">
       <span>Supabase project URL</span>
       <input id="s-url" type="url" inputmode="url" placeholder="https://xxxx.supabase.co" autocomplete="off" spellcheck="false">
@@ -76,6 +93,7 @@
       <span>Capture token</span>
       <input id="s-token" type="password" autocomplete="off" spellcheck="false">
     </label>
+    </div>
     <button type="submit" class="primary">Save settings</button>
     <p class="status" id="s-status" role="status" aria-live="polite"></p>
 

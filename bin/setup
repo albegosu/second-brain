@@ -6,8 +6,11 @@ repository, its secrets and your devices.
     bin/setup --name my-wiki --supabase-ref abcd1234
 
 In order:
-0. With a Supabase access token and no project given, creates a Supabase
-   project for the inbox and waits until it's ready.
+0. Sets up the inbox where captures wait. By default a private inbox
+   repository (<name>-inbox) whose workflow files captures into the wiki with a
+   deploy key, plus a capture token you create for it that can write there and
+   nowhere else. Or, with --inbox supabase, a Supabase project: with an access
+   token and no project given, it creates one and waits until it's ready.
 1. Creates the private GitHub repository from templates/wiki-repo (workflows,
    README, an empty wiki) and clones it locally.
 2. Generates the capture and worker tokens and an ntfy topic.
@@ -45,6 +48,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -52,6 +56,8 @@ from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent
 TEMPLATE = ENGINE / "templates" / "wiki-repo"
+INBOX_TEMPLATE = ENGINE / "templates" / "inbox-repo"
+PAT_URL = "https://github.com/settings/personal-access-tokens/new"
 SCHEMA = ENGINE / "db" / "supabase.sql"
 UPSTREAM = "albegosu/second-brain"
 SUPABASE_API = "https://api.supabase.com/v1"
@@ -201,10 +207,10 @@ def vault(name: str, value: str) -> str:
             f"end $$;\n")
 
 
-def setup_link(url: str, key: str, token: str) -> str:
+def setup_link(settings: dict) -> str:
     """The capture page's settings in the URL fragment, which browsers never send
     to the server (web/app.js reads it and drops it from the address bar)."""
-    data = json.dumps({"url": url, "key": key, "token": token}, separators=(",", ":"))
+    data = json.dumps(settings, separators=(",", ":"))
     return f"{CAPTURE_PAGE}#setup={base64.urlsafe_b64encode(data.encode()).decode().rstrip('=')}"
 
 
@@ -269,6 +275,7 @@ def main():
     ap.add_argument("--name", default="second-brain-wiki", help="repository name (default: second-brain-wiki)")
     ap.add_argument("--dir", help="local clone (default: next to the engine, named like the repository)")
     ap.add_argument("--owner", help="GitHub user or organization (default: the logged-in user)")
+    ap.add_argument("--inbox", choices=["github", "supabase"], help="where captures wait (default: ask; github)")
     ap.add_argument("--supabase-ref", help="Supabase project ref, or its https://<ref>.supabase.co URL")
     ap.add_argument("--env-file", type=Path, default=ENGINE / ".env", help="engine settings to complete")
     ap.add_argument("--no-launch-agent", action="store_true", help="don't install the macOS pull LaunchAgent")
@@ -292,7 +299,191 @@ def main():
     engine_private = sh("gh", "repo", "view", engine, "--json", "visibility", "-q", ".visibility") != "PUBLIC"
     print(f"    wiki repository {repo} (private) at {dest}\n    engine {engine}")
 
-    step("Supabase and Ollama")
+    step("Inbox")
+    print("    Where captures wait before they're filed:\n"
+          "      github    a small private inbox repository next to the wiki (nothing else to sign up for)\n"
+          "      supabase  a free Supabase project (needed by the iPhone and Mac Shortcut for now)")
+    kind = args.inbox or ask("Inbox", default="github").lower()
+    if kind not in ("github", "supabase"):
+        fail(f"unknown inbox {kind!r}: use github or supabase")
+    inbox_repo = f"{repo}-inbox"
+    access = ref = key = ""
+    if kind == "github":
+        if subprocess.run(["gh", "repo", "view", inbox_repo], capture_output=True).returncode == 0:
+            fail(f"{inbox_repo} already exists on GitHub")
+    else:
+        access, ref, key = supabase_questions(args)
+
+    step("Model")
+    print("    ollama (free cloud plan, the default), openai, anthropic, gemini or openrouter.")
+    provider = ask("Model provider", default="ollama", env="BRAIN_PROVIDER").lower()
+    if provider not in MODEL_KEYS:
+        fail(f"unknown provider {provider!r}: use {', '.join(MODEL_KEYS)}")
+    model_key = ask(f"{provider.capitalize()} API key ({MODEL_KEYS[provider]})", secret=True,
+                    env="OLLAMA_API_KEY" if provider == "ollama" else "BRAIN_API_KEY")
+    model = "" if provider == "ollama" else ask("Model (Enter for the default)", env="BRAIN_VLM", required=False)
+
+    step(f"Creating {repo}")
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(TEMPLATE, dest, dirs_exist_ok=True)
+    if kind == "github":  # the inbox repository runs the capture workflow instead
+        (dest / ".github" / "workflows" / "capture.yml").unlink()
+    (dest / "wiki").mkdir(exist_ok=True)
+    (dest / "wiki" / "index.md").write_text(INDEX)
+    push_new_repo(dest, repo, "chore: start the wiki", "Private second-brain wiki")
+
+    ntfy_topic = f"second-brain-{secrets.token_hex(12)}"
+    model_secret = "OLLAMA_API_KEY" if provider == "ollama" else "BRAIN_API_KEY"
+    worker_repos = [repo] + ([inbox_repo] if kind == "github" else [])
+
+    if kind == "github":
+        step(f"Creating {inbox_repo}")
+        inbox_dest = Path(tempfile.mkdtemp(prefix="second-brain-inbox-"))
+        shutil.copytree(INBOX_TEMPLATE, inbox_dest, dirs_exist_ok=True)
+        push_new_repo(inbox_dest, inbox_repo, "chore: start the inbox", "second-brain inbox: captures waiting to be filed")
+        shutil.rmtree(inbox_dest, ignore_errors=True)
+        # The inbox's workflow writes the wiki with a deploy key that only it holds.
+        with tempfile.TemporaryDirectory() as tmp:
+            keyfile = Path(tmp) / "key"
+            sh("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"{inbox_repo} worker", "-f", str(keyfile))
+            sh("gh", "repo", "deploy-key", "add", str(keyfile.with_suffix(".pub")), "-R", repo,
+               "--allow-write", "--title", f"second-brain inbox ({inbox_repo})")
+            sh("gh", "secret", "set", "WIKI_DEPLOY_KEY", "-R", inbox_repo, stdin=keyfile.read_text())
+        sh("gh", "variable", "set", "WIKI_REPOSITORY", "-R", inbox_repo, "--body", repo)
+        print(f"    deploy key: {inbox_repo} can write to {repo}")
+
+    step("Setting repository secrets")
+    for target in worker_repos:
+        if engine != UPSTREAM:
+            sh("gh", "variable", "set", "ENGINE_REPOSITORY", "-R", target, "--body", engine)
+        if provider != "ollama":
+            sh("gh", "variable", "set", "BRAIN_PROVIDER", "-R", target, "--body", provider)
+            if model:
+                sh("gh", "variable", "set", "BRAIN_VLM", "-R", target, "--body", model)
+    values = {model_secret: model_key, "NTFY_TOPIC": ntfy_topic}
+    sql_file = None
+    if kind == "supabase":
+        capture_token, worker_token = secrets.token_hex(24), secrets.token_hex(24)
+        supabase_url = f"https://{ref}.supabase.co"
+        values.update(SUPABASE_URL=supabase_url, SUPABASE_KEY=key, WORKER_TOKEN=worker_token)
+    for target in worker_repos:
+        for name, value in values.items():
+            if target == repo and kind == "github" and name == "NTFY_TOPIC":
+                continue  # the wiki only runs the lint pass
+            sh("gh", "secret", "set", name, "-R", target, stdin=value)
+            print(f"    {target}: {name}")
+
+    if kind == "github":
+        step("Capture token")
+        print(f"""    Your devices write captures into {inbox_repo} with a fine-grained token that
+    can reach that repository and nothing else. GitHub doesn't let a script create
+    one, so it takes one minute by hand:
+      1. Open {PAT_URL}
+      2. Repository access: Only select repositories → {inbox_repo}
+      3. Permissions: Contents → Read and write. Generate and copy it.""")
+        if sys.stdin.isatty() and shutil.which("open"):
+            subprocess.run(["open", PAT_URL], capture_output=True)
+        while True:
+            capture_token = ask("Paste the token", secret=True, env="CAPTURE_TOKEN")
+            problem = check_capture_token(capture_token, inbox_repo, repo)
+            if not problem:
+                break
+            print(f"    {problem}")
+            if not sys.stdin.isatty():
+                fail(problem)
+        settings = {"kind": "github", "repo": inbox_repo, "token": capture_token}
+    else:
+        sql_file = supabase_inbox(args, access, ref, repo, capture_token, worker_token)
+        settings = {"kind": "supabase", "url": supabase_url, "key": key, "token": capture_token}
+
+    step("Local settings")
+    env = {"BRAIN_WIKI": str(dest / "wiki"), "BRAIN_GIT_SYNC": "1", "NTFY_TOPIC": ntfy_topic}
+    if kind == "supabase":
+        env.update(SUPABASE_URL=supabase_url, SUPABASE_KEY=key, INBOX_TOKEN=capture_token, WORKER_TOKEN=worker_token)
+    conflicts = merge_env(args.env_file, env)
+    print(f"    {args.env_file}" + (f" (kept your existing {', '.join(conflicts)})" if conflicts else ""))
+    if platform.system() == "Darwin" and not args.no_launch_agent and confirm("    Pull the wiki every 15 minutes (LaunchAgent)?"):
+        if any(part in dest.parts for part in ("Documents", "Desktop", "Downloads")):
+            print("    macOS doesn't let LaunchAgents read Documents, Desktop or Downloads: move the clone first")
+        else:
+            print(f"    installed {launch_agent(args.name, dest)}")
+    skills = Path.home() / ".claude" / "skills" / "second-brain"
+    if not args.no_skill and not skills.exists() and confirm("    Link the skill into ~/.claude/skills?"):
+        skills.parent.mkdir(parents=True, exist_ok=True)
+        skills.symlink_to(ENGINE / "skill" / "second-brain")
+        print(f"    linked {skills}")
+    default_wiki = Path.home() / "Developer" / "second-brain-wiki" / "wiki"
+    if dest / "wiki" != default_wiki:
+        print(f"    the skill looks in {default_wiki} unless BRAIN_WIKI is set where your agent runs")
+
+    link = setup_link(settings)
+    code = qr(link)
+    devices = f"""  • Connect your phone or computer: scan this with the phone's camera, or open
+    the link on the device, then install the page (it holds the capture token;
+    keep it private):
+      {link}
+""" + (f"{code}" if code else "")
+    if kind == "supabase":
+        devices += f"""  • iPhone or Mac: open "{ENGINE / 'shortcut' / 'Save to second-brain.shortcut'}"
+    and answer its questions with:
+      Supabase project URL   {supabase_url}
+      Publishable key        {key}
+      Capture token          {capture_token}
+    (the token is also INBOX_TOKEN in {args.env_file.name}; keep it private)
+"""
+    else:
+        devices += """  • iPhone: the page works in Safari (paste a link or choose an image), but
+    only the Shortcut shows up in the share sheet, and it needs the Supabase inbox
+    for now.
+"""
+    print(f"""
+Done: https://github.com/{repo}
+
+Next:
+""" + (f"""  • Run {sql_file} in the Supabase SQL editor
+    (https://supabase.com/dashboard/project/{ref}/sql/new).
+""" if sql_file else "") + devices + f"""  • Phone notifications: install the ntfy app and subscribe to {ntfy_topic}
+""" + (f"""  • Your engine {engine} is private: add a read-only deploy key as the README explains.
+""" if engine_private else "") + """  • Share something: it shows up in the wiki within a few minutes.
+""")
+
+
+def push_new_repo(folder: Path, repo: str, message: str, description: str):
+    sh("git", "init", "-q", "-b", "main", cwd=folder)
+    sh("git", "add", "-A", cwd=folder)
+    commit = subprocess.run(["git", "commit", "-q", "-m", message], cwd=folder)  # may ask for a GPG passphrase
+    if commit.returncode:
+        fail(f"git commit failed in {folder}")
+    sh("gh", "repo", "create", repo, "--private", "--source", str(folder), "--remote", "origin", "--push",
+       "--description", description)
+
+
+def check_capture_token(token: str, inbox_repo: str, wiki_repo: str) -> str | None:
+    """None if the token can write to the inbox and can't see the wiki."""
+    def status(repo: str) -> tuple[int, dict]:
+        request = urllib.request.Request(f"https://api.github.com/repos/{repo}", headers={
+            "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+            "User-Agent": "second-brain-setup"})
+        try:
+            with urllib.request.urlopen(request, timeout=30) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, {}
+    code, data = status(inbox_repo)
+    if code == 401:
+        return "GitHub doesn't accept that token."
+    if code != 200:
+        return f"The token can't see {inbox_repo}: select it under Repository access."
+    if not (data.get("permissions") or {}).get("push"):
+        return "The token can read the inbox but not write: set Contents to Read and write."
+    if status(wiki_repo)[0] == 200:
+        return (f"The token can also reach {wiki_repo}. Limit it to {inbox_repo} only, so a lost phone "
+                "can't read your wiki.")
+    return None
+
+
+def supabase_questions(args) -> tuple[str, str, str]:
+    """The Supabase access token, project ref (creating the project if asked) and publishable key."""
     print("    With a Supabase access token this sets up everything in Supabase for you,\n"
           "    including a new free project. Get one at supabase.com/dashboard/account/tokens.")
     access = ask("Supabase access token (Enter to skip and do the Supabase part by hand)",
@@ -317,109 +508,33 @@ def main():
         except RuntimeError as e:
             fail(f"Supabase didn't accept the access token for {ref}: {e}")
     key = key or ask("Supabase publishable key (Project Settings → API Keys)", env="SUPABASE_KEY")
-    print("    Model: ollama (free cloud plan, the default), openai, anthropic, gemini or openrouter.")
-    provider = ask("Model provider", default="ollama", env="BRAIN_PROVIDER").lower()
-    if provider not in MODEL_KEYS:
-        fail(f"unknown provider {provider!r}: use {', '.join(MODEL_KEYS)}")
-    model_key = ask(f"{provider.capitalize()} API key ({MODEL_KEYS[provider]})", secret=True,
-                    env="OLLAMA_API_KEY" if provider == "ollama" else "BRAIN_API_KEY")
-    model = "" if provider == "ollama" else ask("Model (Enter for the default)", env="BRAIN_VLM", required=False)
+    return access, ref, key
 
-    step(f"Creating {repo}")
-    dest.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(TEMPLATE, dest, dirs_exist_ok=True)
-    (dest / "wiki").mkdir(exist_ok=True)
-    (dest / "wiki" / "index.md").write_text(INDEX)
-    sh("git", "init", "-q", "-b", "main", cwd=dest)
-    sh("git", "add", "-A", cwd=dest)
-    commit = subprocess.run(["git", "commit", "-q", "-m", "chore: start the wiki"], cwd=dest)  # may ask for a GPG passphrase
-    if commit.returncode:
-        fail(f"git commit failed in {dest}")
-    sh("gh", "repo", "create", repo, "--private", "--source", str(dest), "--remote", "origin", "--push",
-       "--description", "Private second-brain wiki")
-    if engine != UPSTREAM:
-        sh("gh", "variable", "set", "ENGINE_REPOSITORY", "-R", repo, "--body", engine)
 
-    step("Setting repository secrets")
-    capture_token, worker_token = secrets.token_hex(24), secrets.token_hex(24)
-    ntfy_topic = f"second-brain-{secrets.token_hex(12)}"
-    supabase_url = f"https://{ref}.supabase.co"
-    model_secret = "OLLAMA_API_KEY" if provider == "ollama" else "BRAIN_API_KEY"
-    if provider != "ollama":
-        sh("gh", "variable", "set", "BRAIN_PROVIDER", "-R", repo, "--body", provider)
-        if model:
-            sh("gh", "variable", "set", "BRAIN_VLM", "-R", repo, "--body", model)
-    for name, value in {model_secret: model_key, "SUPABASE_URL": supabase_url, "SUPABASE_KEY": key,
-                        "WORKER_TOKEN": worker_token, "NTFY_TOPIC": ntfy_topic}.items():
-        sh("gh", "secret", "set", name, "-R", repo, stdin=value)
-        print(f"    {name}")
-
+def supabase_inbox(args, access: str, ref: str, repo: str, capture_token: str, worker_token: str) -> Path | None:
+    """Applies the schema, token hashes and Vault values, or writes them to a file."""
     step("Setting up the Supabase inbox")
     sql = setup_sql(repo, capture_token, worker_token)
     print("    For instant captures, create a fine-grained GitHub token at\n"
-          "    https://github.com/settings/personal-access-tokens/new with access to\n"
+          f"    {PAT_URL} with access to\n"
           f"    {repo} only and Contents: Read and write. Without it, captures wait for the 6-hour run.")
     dispatch = ask("GitHub token for the capture trigger (Enter to skip)", secret=True,
                    env="GITHUB_DISPATCH_TOKEN", required=False) if access else ""
-    sql_file = None
     if access:
         try:
             supabase(access, "POST", f"/projects/{ref}/database/query",
                      {"query": sql + (vault("github_dispatch_token", dispatch) if dispatch else "")})
             print("    schema, token hashes and Vault values applied")
+            return None
         except RuntimeError as e:
             print(f"    the Supabase API refused the SQL ({e}); writing it to a file instead")
-            access = ""
-    if not access:
-        sql_file = ENGINE / "data" / f"supabase-{args.name}.sql"
-        sql_file.parent.mkdir(exist_ok=True)
-        sql_file.write_text(sql + "\n-- For instant captures, add your GitHub token too:\n"
-                            "-- select vault.create_secret('<token>', 'github_dispatch_token');\n")
-        sql_file.chmod(0o600)
-        print(f"    wrote {sql_file}")
-
-    step("Local settings")
-    conflicts = merge_env(args.env_file, {
-        "BRAIN_WIKI": str(dest / "wiki"), "BRAIN_GIT_SYNC": "1", "SUPABASE_URL": supabase_url,
-        "SUPABASE_KEY": key, "INBOX_TOKEN": capture_token, "WORKER_TOKEN": worker_token, "NTFY_TOPIC": ntfy_topic})
-    print(f"    {args.env_file}" + (f" (kept your existing {', '.join(conflicts)})" if conflicts else ""))
-    if platform.system() == "Darwin" and not args.no_launch_agent and confirm("    Pull the wiki every 15 minutes (LaunchAgent)?"):
-        if any(part in dest.parts for part in ("Documents", "Desktop", "Downloads")):
-            print("    macOS doesn't let LaunchAgents read Documents, Desktop or Downloads: move the clone first")
-        else:
-            print(f"    installed {launch_agent(args.name, dest)}")
-    skills = Path.home() / ".claude" / "skills" / "second-brain"
-    if not args.no_skill and not skills.exists() and confirm("    Link the skill into ~/.claude/skills?"):
-        skills.parent.mkdir(parents=True, exist_ok=True)
-        skills.symlink_to(ENGINE / "skill" / "second-brain")
-        print(f"    linked {skills}")
-    default_wiki = Path.home() / "Developer" / "second-brain-wiki" / "wiki"
-    if dest / "wiki" != default_wiki:
-        print(f"    the skill looks in {default_wiki} unless BRAIN_WIKI is set where your agent runs")
-
-    link = setup_link(supabase_url, key, capture_token)
-    code = qr(link)
-    print(f"""
-Done: https://github.com/{repo}
-
-Next:
-""" + (f"""  • Run {sql_file} in the Supabase SQL editor
-    (https://supabase.com/dashboard/project/{ref}/sql/new).
-""" if sql_file else "") + f"""  • Install the Shortcut: open "{ENGINE / 'shortcut' / 'Save to second-brain.shortcut'}"
-    and answer its questions with:
-      Supabase project URL   {supabase_url}
-      Publishable key        {key}
-      Capture token          {capture_token}
-    (the token is also INBOX_TOKEN in {args.env_file.name}; keep it private)
-  • Android or a computer: open this link there and install the page
-    (it holds the capture token too; keep it private):
-      {link}
-""" + (f"""    or scan it with the phone's camera:
-{code}""" if code else "") + f"""  • Phone notifications: install the ntfy app and subscribe to {ntfy_topic}
-""" + (f"""  • Your engine {engine} is private: add a read-only deploy key as the README explains.
-""" if engine_private else "") + """  • Share a page with the Shortcut: it shows up in the wiki within a few minutes.
-""")
-
+    sql_file = ENGINE / "data" / f"supabase-{args.name}.sql"
+    sql_file.parent.mkdir(exist_ok=True)
+    sql_file.write_text(sql + "\n-- For instant captures, add your GitHub token too:\n"
+                        "-- select vault.create_secret('<token>', 'github_dispatch_token');\n")
+    sql_file.chmod(0o600)
+    print(f"    wrote {sql_file}")
+    return sql_file
 
 if __name__ == "__main__":
     try:
