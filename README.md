@@ -31,7 +31,8 @@ What sets it apart and where it's going: [PRODUCT.md](PRODUCT.md) ·
 [ROADMAP.md](ROADMAP.md).
 
 ```
-Shortcut or capture page ──► Supabase (inbox) ──► GitHub Actions (worker + Ollama Cloud) ──► wiki repository
+capture page ──► inbox repository (queue/) ──► GitHub Actions (worker + model) ──► wiki repository
+ (or Shortcut ──► Supabase inbox)
                                                      │                                       │
                                                      ▼                                  git pull on the Mac
                                              ntfy push to the phone                          ▼
@@ -40,12 +41,11 @@ Shortcut or capture page ──► Supabase (inbox) ──► GitHub Actions (wo
 
 ## Quick start
 
-You need a GitHub account with [gh](https://cli.github.com) logged in, a free
-[Supabase](https://supabase.com) project, an API key for the model (a free
-[Ollama](https://ollama.com) key by default, or OpenAI, Anthropic, Gemini or
-OpenRouter)
-and an iPhone or Mac with Shortcuts, or an Android phone or any computer with a
-browser.
+You need a GitHub account with [gh](https://cli.github.com) logged in and an API
+key for the model: a free [Ollama](https://ollama.com) key by default, or
+OpenAI, Anthropic, Gemini or OpenRouter. Capture from an Android phone or any
+computer with a browser; the iPhone and Mac Shortcut needs the Supabase inbox
+([below](#two-inboxes)).
 
 1. Get the engine:
 
@@ -54,20 +54,18 @@ browser.
    cd ~/Developer/second-brain
    ```
 
-2. Set everything up. It asks for a Supabase access token and the model
-   provider and its key;
-   with the token it creates the Supabase project and its database for you (or
-   give it an existing project, or skip the token and run the SQL by hand). Then
-   it creates your private wiki repository and its secrets:
+2. Set everything up. It asks for the model provider and its key, creates your
+   private wiki repository and a private inbox repository next to it, and wires
+   them together:
 
    ```bash
    bin/setup
    ```
 
-3. Connect a device with what `bin/setup` prints at the end. On an iPhone or
-   Mac, open `shortcut/Save to second-brain.shortcut` and answer its three
-   questions. On Android or a computer, scan the printed QR code (or open the
-   setup link) and install the [capture page](#android-and-desktop).
+   It stops once to let you create a capture token on GitHub (a page it opens
+   for you: select only the inbox repository, Contents: Read and write).
+3. Scan the QR code it prints with your phone, or open the link on a computer,
+   and install the [capture page](#android-and-desktop).
 4. Optionally, subscribe to the printed topic in the [ntfy](https://ntfy.sh) app
    to get a push when each capture is filed.
 5. Share a post or a page. A few minutes later it's in your wiki, and Claude
@@ -314,6 +312,28 @@ workflow's 6-hour run prevents that.
 ln -s ~/Developer/second-brain/skill/second-brain ~/.claude/skills/second-brain
 ```
 
+## Two inboxes
+
+Captures wait in an inbox until the worker files them. `bin/setup` asks which:
+
+- **GitHub (the default):** a private repository, `<wiki>-inbox`. The capture
+  page writes one JSON file per capture into its `queue/` folder through the
+  GitHub API, and each push starts its workflow
+  ([templates/inbox-repo](templates/inbox-repo)), which files what's queued into
+  the wiki and empties the queue. No other account, and captures are filed right
+  away. The token on your devices is a fine-grained GitHub token limited to the
+  inbox repository with Contents: Read and write, so a lost phone can write
+  captures and nothing else; `bin/setup` checks that it can't reach the wiki. The
+  workflow writes the wiki with a deploy key that `bin/setup` creates and keeps
+  in the inbox's secrets. When the queue is empty the inbox's history is started
+  over, so shared images don't pile up. Fine-grained tokens expire (a year at
+  most): when captures start failing with "rejected the capture token", make a
+  new one and paste it in the page's Settings.
+- **Supabase** (`bin/setup --inbox supabase`): a free Supabase project whose
+  functions queue captures behind a capture-only token. With a Supabase access
+  token, `bin/setup` creates the project and its database. The iPhone and Mac
+  Shortcut only speaks to this inbox for now.
+
 ## The Shortcut
 
 A single one: Shortcuts is the same app on iOS and macOS and syncs over iCloud.
@@ -372,13 +392,12 @@ the Shortcut by hand.
 The capture page does what the Shortcut does, for Android and any desktop
 browser: [albegosu.github.io/second-brain/](https://albegosu.github.io/second-brain/). It's a static page (in
 [`web/`](web)) that calls the same Supabase functions, so nothing changes on the
-server.
+server. It works with either [inbox](#two-inboxes).
 
 - **Connect it:** scan the QR code `bin/setup` prints, open or paste its setup
-  link, or enter the same
-  three values as the Shortcut (Supabase project URL, publishable key, capture
-  token). They're kept in that browser's storage and sent only to your Supabase
-  project. The setup link carries them in the URL fragment, which browsers never
+  link, or fill in the inbox by hand (GitHub: the inbox repository and the
+  capture token; Supabase: project URL, publishable key and capture token). The
+  settings are kept in that browser's storage and sent only to your inbox. The setup link carries them in the URL fragment, which browsers never
   send to a server; the page removes it from the address bar once it's read.
   **Copy setup link** in Settings makes one to connect another device. The QR
   code needs `qrencode` (`brew install qrencode`) or the `segno` or `qrcode`
