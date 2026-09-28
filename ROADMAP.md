@@ -152,6 +152,10 @@ history, and the Supabase design only stores token hashes.
 
 ## Operations
 
+- ~~**An inbox without Supabase.**~~ Done: the default inbox is a private GitHub
+  repository; the capture page writes a file per capture and its workflow files
+  them, so setup needs no Supabase account and captures are filed at once. Still
+  open: the Shortcut writing to it, so iPhone and Mac can drop Supabase too.
 - ~~**Model providers beyond Ollama.**~~ Done: `BRAIN_PROVIDER` sends the same
   requests to OpenAI, Anthropic, Gemini, OpenRouter or any OpenAI-compatible
   server, so nobody needs an Ollama account; `bin/setup` asks which one.

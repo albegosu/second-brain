@@ -49,6 +49,7 @@ form { display: grid; gap: 24px; }
 .field { display: grid; gap: 8px; }
 .field > span, legend { font: 500 14px/1.2 var(--sans); letter-spacing: 0.01em; }
 .link-input { display: grid; gap: 12px; }
+.group { display: grid; gap: 24px; }
 
 input[type="url"], input[type="text"], input[type="password"], textarea {
   width: 100%;

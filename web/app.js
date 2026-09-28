@@ -2,7 +2,8 @@
 //
 // It does what the Shortcut does on iPhone and Mac: take a shared link, text or
 // image, ask what caught your eye and an optional note, and send it to the
-// Supabase inbox (capture for links, capture_image for images). The settings and
+// inbox: a file in your GitHub inbox repository, or the Supabase inbox
+// (capture for links, capture_image for images). The settings and
 // any capture waiting to be sent stay in this browser; the page has no server.
 "use strict";
 
@@ -41,7 +42,7 @@ function save(key, value) {
   }
 }
 
-let settings = load(SETTINGS, null);
+let settings = null;  // set in start(), after normalize() is defined
 let image = null;        // the shared or chosen image (a Blob), when there is one
 let installPrompt = null;
 let flushing = false;
@@ -55,14 +56,26 @@ function projectUrl(value) {
   return url;
 }
 
-function validSettings(s) {
-  return s && typeof s === "object" && /^https:\/\/[^/\s]+$/i.test(s.url || "") && s.key && s.token;
+// Two kinds of inbox: "github" (a private inbox repository the page writes a
+// file into; bin/setup's default) and "supabase" (the database inbox). Settings
+// saved before there were two kinds have no kind: they're Supabase.
+function normalize(s) {
+  if (!s || typeof s !== "object") return null;
+  if (s.kind === "github") {
+    const repo = String(s.repo || "").trim().replace(/^https:\/\/github\.com\//i, "").replace(/\/+$/, "");
+    const token = String(s.token || "").trim();
+    return /^[\w.-]+\/[\w.-]+$/.test(repo) && token ? { kind: "github", repo, token } : null;
+  }
+  const url = projectUrl(String(s.url || ""));
+  const key = String(s.key || "").trim();
+  const token = String(s.token || "").trim();
+  return /^https:\/\/[^/\s]+$/i.test(url) && key && token ? { kind: "supabase", url, key, token } : null;
 }
 
 // bin/setup and "Copy setup link" put the settings in the fragment, which
-// browsers never send to the server: #setup=<base64url of {"url","key","token"}>.
+// browsers never send to the server: #setup=<base64url of the settings JSON>.
 function setupLink() {
-  const json = JSON.stringify({ url: settings.url, key: settings.key, token: settings.token });
+  const json = JSON.stringify(settings);
   const b64 = btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   return `${new URL(".", location.href).href}#setup=${b64}`;
 }
@@ -78,9 +91,7 @@ function parseSetupLink(text) {
   const match = String(text).match(/#setup=([A-Za-z0-9_-]+)/);
   if (!match) return null;
   try {
-    const s = JSON.parse(atob(match[1].replace(/-/g, "+").replace(/_/g, "/")));
-    s.url = projectUrl(String(s.url || ""));
-    return validSettings(s) ? { url: s.url, key: String(s.key).trim(), token: String(s.token).trim() } : null;
+    return normalize(JSON.parse(atob(match[1].replace(/-/g, "+").replace(/_/g, "/"))));
   } catch {
     return null;
   }
@@ -195,6 +206,50 @@ function toBase64(blob) {
 // ok: queued. retry: the inbox wasn't reachable, try later. Otherwise the
 // message says what to fix.
 async function send(item) {
+  return settings.kind === "github" ? sendGithub(item) : sendSupabase(item);
+}
+
+// One file per capture in queue/ of the inbox repository; the push starts its workflow.
+async function sendGithub(item) {
+  const { repo, token } = settings;
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+  const payload = item.image
+    ? { image: item.image, mime: item.mime, note: item.note, at: new Date().toISOString() }
+    : { url: item.url, note: item.note, at: new Date().toISOString() };
+  let res;
+  try {
+    res = await fetch(`https://api.github.com/repos/${repo}/contents/queue/${name}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+      body: JSON.stringify({ message: "capture", content: utf8Base64(JSON.stringify(payload)) }),
+    });
+  } catch {
+    return { retry: true, message: "GitHub isn't reachable." };
+  }
+  if (res.ok) return { ok: true };
+  if (res.status >= 500 || res.status === 409 || res.status === 429) {
+    return { retry: true, message: `GitHub answered ${res.status}.` };
+  }
+  if (res.status === 401) return { message: "GitHub rejected the capture token (expired?). Make a new one and update Settings." };
+  if (res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0") {
+    return { retry: true, message: "GitHub's rate limit: it's sent later." };
+  }
+  if (res.status === 403 || res.status === 404) {
+    return { message: `The token can't write to ${repo}. It needs that repository with Contents: Read and write.` };
+  }
+  let said = "";
+  try { said = (await res.json()).message || ""; } catch { /* not JSON */ }
+  return { message: said ? `GitHub said: ${said}` : `GitHub answered ${res.status}.` };
+}
+
+function utf8Base64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
+async function sendSupabase(item) {
   const { url, key, token } = settings;
   const [fn, body] = item.image
     ? ["capture_image", { image: item.image, mime: item.mime, note: item.note, token }]
@@ -289,9 +344,14 @@ function showSettings() {
   $("title").textContent = settings ? "Settings" : "Connect";
   $("toggle-settings").textContent = "Back";
   $("extras").hidden = !settings;
-  $("s-url").value = settings ? settings.url : "";
-  $("s-key").value = settings ? settings.key : "";
-  $("s-token").value = settings ? settings.token : "";
+  const kind = settings ? settings.kind : "github";
+  document.querySelector(`input[name="kind"][value="${kind}"]`).checked = true;
+  showKind();
+  $("s-repo").value = settings && kind === "github" ? settings.repo : "";
+  $("s-gh-token").value = settings && kind === "github" ? settings.token : "";
+  $("s-url").value = settings && kind === "supabase" ? settings.url : "";
+  $("s-key").value = settings && kind === "supabase" ? settings.key : "";
+  $("s-token").value = settings && kind === "supabase" ? settings.token : "";
   if (settings) $("bookmarklet").href = bookmarklet();
 }
 
@@ -382,12 +442,27 @@ function finish(message) {
   if (window.name === POPUP || fromShare) setTimeout(() => window.close(), 900);
 }
 
+function showKind() {
+  const kind = document.querySelector('input[name="kind"]:checked').value;
+  $("github-fields").hidden = kind !== "github";
+  $("supabase-fields").hidden = kind !== "supabase";
+}
+
 function onSettings(event) {
   event.preventDefault();
-  const next = { url: projectUrl($("s-url").value), key: $("s-key").value.trim(), token: $("s-token").value.trim() };
-  if (!validSettings(next)) {
-    return status("Fill in all three: the project URL looks like https://xxxx.supabase.co.", "error", "s-status");
+  const kind = document.querySelector('input[name="kind"]:checked').value;
+  const next = normalize(kind === "github"
+    ? { kind, repo: $("s-repo").value, token: $("s-gh-token").value }
+    : { kind, url: $("s-url").value, key: $("s-key").value, token: $("s-token").value });
+  if (!next) {
+    return status(kind === "github"
+      ? "Fill in both: the repository looks like you/second-brain-wiki-inbox."
+      : "Fill in all three: the project URL looks like https://xxxx.supabase.co.", "error", "s-status");
   }
+  applySettings(next);
+}
+
+function applySettings(next) {
   settings = next;
   if (!save(SETTINGS, settings)) {
     status("This browser won't store settings (private window?): they last until you close the page.", "error", "s-status");
@@ -405,12 +480,10 @@ function bind() {
   $("s-link").addEventListener("input", () => {
     const s = parseSetupLink($("s-link").value);
     if (!s) return;
-    $("s-url").value = s.url;
-    $("s-key").value = s.key;
-    $("s-token").value = s.token;
     $("s-link").value = "";
-    $("settings").requestSubmit();
+    applySettings(s);
   });
+  document.querySelectorAll('input[name="kind"]').forEach((r) => r.addEventListener("change", showKind));
   $("intents").addEventListener("change", updateGrowHint);
   $("note").addEventListener("input", updateGrowHint);
   $("note").addEventListener("keydown", (e) => {
@@ -484,6 +557,7 @@ function bind() {
 }
 
 async function start() {
+  settings = normalize(load(SETTINGS, null));
   renderIntents();
   bind();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
