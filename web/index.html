@@ -58,7 +58,12 @@
   </form>
 
   <form id="settings" novalidate hidden>
-    <p>Connect this device to your inbox with the three values the Shortcut asks for; <code>bin/new-wiki</code> prints them. They stay in this browser.</p>
+    <p>Connect this device to your inbox with the three values the Shortcut asks for; <code>bin/setup</code> prints them (and a QR code to scan with the phone). They stay in this browser.</p>
+    <label class="field">
+      <span>Setup link</span>
+      <input id="s-link" type="text" placeholder="Paste the link bin/setup printed" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="muted">Or fill in the three values:</p>
     <label class="field">
       <span>Supabase project URL</span>
       <input id="s-url" type="url" inputmode="url" placeholder="https://xxxx.supabase.co" autocomplete="off" spellcheck="false">
