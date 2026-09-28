@@ -28,7 +28,22 @@ import yt_dlp
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # Without a local Ollama (GitHub Actions): OLLAMA_HOST=https://ollama.com plus the API key.
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "")
-VLM = os.environ.get("BRAIN_VLM", "gemma4:31b-cloud")
+# The model provider. "ollama" (the default) uses the Ollama API above; the others
+# use their OpenAI-compatible chat endpoint with BRAIN_API_KEY. Any other
+# OpenAI-compatible server works as "openai-compatible" with BRAIN_API_BASE.
+PROVIDERS = {  # name: (API base, default vision model)
+    "openai": ("https://api.openai.com/v1", "gpt-4.1-mini"),
+    "anthropic": ("https://api.anthropic.com/v1", "claude-haiku-4-5-20251001"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash"),
+    "openrouter": ("https://openrouter.ai/api/v1", "google/gemini-2.5-flash"),
+    "openai-compatible": ("", ""),
+}
+PROVIDER = os.environ.get("BRAIN_PROVIDER", "").strip().lower() or "ollama"
+if PROVIDER != "ollama" and PROVIDER not in PROVIDERS:
+    raise SystemExit(f"BRAIN_PROVIDER={PROVIDER!r}: use ollama, {', '.join(PROVIDERS)}")
+API_BASE = (os.environ.get("BRAIN_API_BASE") or PROVIDERS.get(PROVIDER, ("", ""))[0]).rstrip("/")
+API_KEY = os.environ.get("BRAIN_API_KEY", "")
+VLM = os.environ.get("BRAIN_VLM") or ("gemma4:31b-cloud" if PROVIDER == "ollama" else PROVIDERS[PROVIDER][1])
 ROOT = Path(__file__).resolve().parent.parent
 # Absolute, so paths stay valid whatever the working directory.
 MEDIA = Path(os.environ.get("BRAIN_MEDIA", ROOT / "data" / "media")).expanduser().resolve()
@@ -773,6 +788,8 @@ def palette(frames: list[Path], width: int = 96) -> list[dict]:
 
 def chat(system: str, user: str, images: list[Path] | None = None, as_json: bool = False,
          num_ctx: int = 16384) -> str:
+    if PROVIDER != "ollama":
+        return chat_openai(system, user, images, as_json)
     message = {"role": "user", "content": user}
     if images:
         message["images"] = [base64.b64encode(f.read_bytes()).decode() for f in images]
@@ -785,6 +802,30 @@ def chat(system: str, user: str, images: list[Path] | None = None, as_json: bool
     if r.is_error:  # Ollama explains why in the body (e.g. a paid cloud model)
         raise RuntimeError(f"{VLM}: {r.status_code} {r.text[:300]}")
     return r.json()["message"]["content"]
+
+
+IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+               ".gif": "image/gif"}
+
+
+def chat_openai(system: str, user: str, images: list[Path] | None, as_json: bool) -> str:
+    """The same request through an OpenAI-compatible chat completions endpoint."""
+    if not API_BASE or not VLM:
+        raise RuntimeError(f"{PROVIDER}: set BRAIN_API_BASE and BRAIN_VLM")
+    content = [{"type": "text", "text": user}]
+    for f in images or []:
+        mime = IMAGE_TYPES.get(f.suffix.lower(), "image/jpeg")
+        content.append({"type": "image_url", "image_url": {
+            "url": f"data:{mime};base64,{base64.b64encode(f.read_bytes()).decode()}"}})
+    body = {"model": VLM, "temperature": 0.2, "max_tokens": 8192,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}]}
+    if as_json and PROVIDER != "anthropic":  # Anthropic's compatibility layer ignores it; the prompt asks for JSON anyway
+        body["response_format"] = {"type": "json_object"}
+    headers = {"Authorization": f"Bearer {API_KEY}"} if API_KEY else {}
+    r = httpx.post(f"{API_BASE}/chat/completions", json=body, headers=headers, timeout=600)
+    if r.is_error:
+        raise RuntimeError(f"{PROVIDER} {VLM}: {r.status_code} {r.text[:300]}")
+    return r.json()["choices"][0]["message"]["content"] or ""
 
 
 def unfence(raw: str) -> str:

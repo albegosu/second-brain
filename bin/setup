@@ -11,8 +11,9 @@ In order:
 1. Creates the private GitHub repository from templates/wiki-repo (workflows,
    README, an empty wiki) and clones it locally.
 2. Generates the capture and worker tokens and an ntfy topic.
-3. Sets the repository secrets: OLLAMA_API_KEY, SUPABASE_URL, SUPABASE_KEY,
-   WORKER_TOKEN and NTFY_TOPIC.
+3. Sets the repository secrets: the model provider's key (OLLAMA_API_KEY, or
+   BRAIN_API_KEY plus the BRAIN_PROVIDER variable for openai, anthropic, gemini
+   or openrouter), SUPABASE_URL, SUPABASE_KEY, WORKER_TOKEN and NTFY_TOPIC.
 4. Sets up the Supabase inbox: db/supabase.sql, the token hashes and the Vault
    values the capture trigger reads. With a Supabase access token it runs the
    SQL itself; without one it writes the SQL to a file for the SQL editor.
@@ -25,7 +26,7 @@ In order:
 
 Needs git and a logged-in gh. Standard library only, so it runs before the
 virtualenv exists. Secrets come from hidden prompts or the environment
-(OLLAMA_API_KEY, SUPABASE_ACCESS_TOKEN, SUPABASE_KEY, GITHUB_DISPATCH_TOKEN), never from the
+(OLLAMA_API_KEY, BRAIN_API_KEY, SUPABASE_ACCESS_TOKEN, SUPABASE_KEY, GITHUB_DISPATCH_TOKEN), never from the
 command line. Use a Supabase project dedicated to this wiki: its token hashes
 are replaced.
 """
@@ -54,6 +55,13 @@ TEMPLATE = ENGINE / "templates" / "wiki-repo"
 SCHEMA = ENGINE / "db" / "supabase.sql"
 UPSTREAM = "albegosu/second-brain"
 SUPABASE_API = "https://api.supabase.com/v1"
+MODEL_KEYS = {  # provider: where to get an API key
+    "ollama": "ollama.com/settings/keys",
+    "openai": "platform.openai.com/api-keys",
+    "anthropic": "console.anthropic.com/settings/keys",
+    "gemini": "aistudio.google.com/apikey",
+    "openrouter": "openrouter.ai/keys",
+}
 CAPTURE_PAGE = "https://albegosu.github.io/second-brain/"  # web/, for Android and desktop
 INDEX = """# Second brain
 
@@ -309,7 +317,13 @@ def main():
         except RuntimeError as e:
             fail(f"Supabase didn't accept the access token for {ref}: {e}")
     key = key or ask("Supabase publishable key (Project Settings → API Keys)", env="SUPABASE_KEY")
-    ollama = ask("Ollama API key (ollama.com/settings/keys)", secret=True, env="OLLAMA_API_KEY")
+    print("    Model: ollama (free cloud plan, the default), openai, anthropic, gemini or openrouter.")
+    provider = ask("Model provider", default="ollama", env="BRAIN_PROVIDER").lower()
+    if provider not in MODEL_KEYS:
+        fail(f"unknown provider {provider!r}: use {', '.join(MODEL_KEYS)}")
+    model_key = ask(f"{provider.capitalize()} API key ({MODEL_KEYS[provider]})", secret=True,
+                    env="OLLAMA_API_KEY" if provider == "ollama" else "BRAIN_API_KEY")
+    model = "" if provider == "ollama" else ask("Model (Enter for the default)", env="BRAIN_VLM", required=False)
 
     step(f"Creating {repo}")
     dest.mkdir(parents=True, exist_ok=True)
@@ -330,7 +344,12 @@ def main():
     capture_token, worker_token = secrets.token_hex(24), secrets.token_hex(24)
     ntfy_topic = f"second-brain-{secrets.token_hex(12)}"
     supabase_url = f"https://{ref}.supabase.co"
-    for name, value in {"OLLAMA_API_KEY": ollama, "SUPABASE_URL": supabase_url, "SUPABASE_KEY": key,
+    model_secret = "OLLAMA_API_KEY" if provider == "ollama" else "BRAIN_API_KEY"
+    if provider != "ollama":
+        sh("gh", "variable", "set", "BRAIN_PROVIDER", "-R", repo, "--body", provider)
+        if model:
+            sh("gh", "variable", "set", "BRAIN_VLM", "-R", repo, "--body", model)
+    for name, value in {model_secret: model_key, "SUPABASE_URL": supabase_url, "SUPABASE_KEY": key,
                         "WORKER_TOKEN": worker_token, "NTFY_TOPIC": ntfy_topic}.items():
         sh("gh", "secret", "set", name, "-R", repo, stdin=value)
         print(f"    {name}")

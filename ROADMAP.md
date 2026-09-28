@@ -152,6 +152,10 @@ history, and the Supabase design only stores token hashes.
 
 ## Operations
 
+- ~~**Model providers beyond Ollama.**~~ Done: `BRAIN_PROVIDER` sends the same
+  requests to OpenAI, Anthropic, Gemini, OpenRouter or any OpenAI-compatible
+  server, so nobody needs an Ollama account; `bin/setup` asks which one.
+
 - **Extractor test suite** with recorded fixtures (X, Instagram, LinkedIn, plain
   pages), so platform changes show up as failing tests instead of failed captures.
   A first suite exists (`tests/`, the DESIGN.md export on a synthetic wiki); the

@@ -41,7 +41,9 @@ Shortcut or capture page ──► Supabase (inbox) ──► GitHub Actions (wo
 ## Quick start
 
 You need a GitHub account with [gh](https://cli.github.com) logged in, a free
-[Supabase](https://supabase.com) project, an [Ollama](https://ollama.com) API key
+[Supabase](https://supabase.com) project, an API key for the model (a free
+[Ollama](https://ollama.com) key by default, or OpenAI, Anthropic, Gemini or
+OpenRouter)
 and an iPhone or Mac with Shortcuts, or an Android phone or any computer with a
 browser.
 
@@ -52,7 +54,8 @@ browser.
    cd ~/Developer/second-brain
    ```
 
-2. Set everything up. It asks for a Supabase access token and the Ollama key;
+2. Set everything up. It asks for a Supabase access token and the model
+   provider and its key;
    with the token it creates the Supabase project and its database for you (or
    give it an existing project, or skip the token and run the SQL by hand). Then
    it creates your private wiki repository and its secrets:
@@ -460,6 +463,7 @@ Only the title, the summary and the URL go to ntfy.sh.
 | `BRAIN_WIKI` | `wiki/` in this repo | where the wiki is written: the `wiki/` folder of the wiki repository, or a copy for tests |
 | `BRAIN_MEDIA` | `data/media` | downloaded media (out of git) |
 | `OLLAMA_HOST` · `OLLAMA_API_KEY` | `http://localhost:11434` · — | local Ollama, or `https://ollama.com` with an API key (on Actions, with `BRAIN_VLM=gemma4:31b`) |
+| `BRAIN_PROVIDER` · `BRAIN_API_KEY` · `BRAIN_API_BASE` | `ollama` · — · per provider | another model provider through its OpenAI-compatible API: `openai`, `anthropic`, `gemini`, `openrouter`, or `openai-compatible` with `BRAIN_API_BASE`. `BRAIN_VLM` defaults to `gpt-4.1-mini`, `claude-haiku-4-5-20251001`, `gemini-2.5-flash` and `google/gemini-2.5-flash`. On Actions: repository variable `BRAIN_PROVIDER` (and optionally `BRAIN_VLM`), secret `BRAIN_API_KEY` |
 | `SUPABASE_URL` · `SUPABASE_KEY` · `WORKER_TOKEN` | — | Supabase inbox |
 | `INBOX_TOKEN` · `INBOX_URL` | — · `http://localhost:8000` | Shortcut token · local inbox |
 | `NTFY_TOPIC` | — | phone notifications |
