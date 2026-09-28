@@ -58,7 +58,12 @@ jobs:
         env:
           OLLAMA_HOST: https://ollama.com
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
-          BRAIN_VLM: gemma4:31b
+          # Another provider (openai, anthropic, gemini, openrouter): repository
+          # variable BRAIN_PROVIDER, optional BRAIN_VLM, and secret BRAIN_API_KEY.
+          BRAIN_PROVIDER: ${{ vars.BRAIN_PROVIDER }}
+          BRAIN_API_KEY: ${{ secrets.BRAIN_API_KEY }}
+          BRAIN_API_BASE: ${{ vars.BRAIN_API_BASE }}
+          BRAIN_VLM: ${{ vars.BRAIN_VLM || (vars.BRAIN_PROVIDER == '' && 'gemma4:31b' || '') }}
           BRAIN_WIKI: ${{ github.workspace }}/wiki
           BRAIN_GIT_SYNC: "1"
           HYPAR_URL: ${{ secrets.HYPAR_URL }}      # optional: keep hypar's copy of the index current
