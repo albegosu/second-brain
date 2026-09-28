@@ -1,7 +1,7 @@
 // Service worker for the capture page: it receives Android shares (the
 // manifest's share_target POSTs to ./share) and keeps the page usable offline.
 // Requests to the Supabase inbox never pass through here: they're cross-origin.
-const SHELL = "second-brain-shell-v1";
+const SHELL = "second-brain-shell-v2";
 const SHARE = "second-brain-share";  // read and emptied by app.js
 const FILES = ["./", "style.css", "app.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
 

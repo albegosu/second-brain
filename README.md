@@ -52,18 +52,19 @@ browser.
    cd ~/Developer/second-brain
    ```
 
-2. Create your private wiki repository and wire everything to it. It asks for
-   the Supabase project, an optional Supabase access token (to set up the
-   database for you) and the Ollama key:
+2. Set everything up. It asks for a Supabase access token and the Ollama key;
+   with the token it creates the Supabase project and its database for you (or
+   give it an existing project, or skip the token and run the SQL by hand). Then
+   it creates your private wiki repository and its secrets:
 
    ```bash
-   bin/new-wiki
+   bin/setup
    ```
 
-3. Connect a device with what `bin/new-wiki` prints at the end. On an iPhone or
+3. Connect a device with what `bin/setup` prints at the end. On an iPhone or
    Mac, open `shortcut/Save to second-brain.shortcut` and answer its three
-   questions. On Android or a computer, open the printed setup link and install
-   the [capture page](#android-and-desktop).
+   questions. On Android or a computer, scan the printed QR code (or open the
+   setup link) and install the [capture page](#android-and-desktop).
 4. Optionally, subscribe to the printed topic in the [ntfy](https://ntfy.sh) app
    to get a push when each capture is filed.
 5. Share a post or a page. A few minutes later it's in your wiki, and Claude
@@ -220,7 +221,7 @@ ollama pull gemma4:31b-cloud  # vision and writing; the only free one on the fre
 ```
 
 **Worker on GitHub Actions (recommended).** It doesn't depend on any computer.
-`bin/new-wiki` sets all of this up (see Quick start); these are the steps it takes.
+`bin/setup` sets all of this up (see Quick start); these are the steps it takes.
 The workflows live in the private wiki repository; start it from
 [templates/wiki-repo](templates/wiki-repo) with the wiki in `wiki/`. `capture`
 processes the pending inbox when Supabase triggers it (see the Supabase inbox
@@ -370,12 +371,17 @@ browser: [albegosu.github.io/second-brain/](https://albegosu.github.io/second-br
 [`web/`](web)) that calls the same Supabase functions, so nothing changes on the
 server.
 
-- **Connect it:** open the setup link `bin/new-wiki` prints, or enter the same
+- **Connect it:** scan the QR code `bin/setup` prints, open or paste its setup
+  link, or enter the same
   three values as the Shortcut (Supabase project URL, publishable key, capture
   token). They're kept in that browser's storage and sent only to your Supabase
   project. The setup link carries them in the URL fragment, which browsers never
   send to a server; the page removes it from the address bar once it's read.
-  **Copy setup link** in Settings makes one to connect another device.
+  **Copy setup link** in Settings makes one to connect another device. The QR
+  code needs `qrencode` (`brew install qrencode`) or the `segno` or `qrcode`
+  Python package; without one, `bin/setup` prints only the link.
+- **Back where you were:** after sending a capture shared from another app, the
+  page closes itself so you return to that app (the bookmarklet's window too).
 - **Android:** open the page in Chrome and install it (⋮ → **Install app** or
   **Add to Home screen**). It then shows up in the share sheet of every app, for
   links, text with a link in it (what LinkedIn and Instagram share) and images.

@@ -45,6 +45,7 @@ let settings = load(SETTINGS, null);
 let image = null;        // the shared or chosen image (a Blob), when there is one
 let installPrompt = null;
 let flushing = false;
+let fromShare = false;   // opened from Android's share sheet: close when done
 
 // --- Settings ----------------------------------------------------------------
 
@@ -58,7 +59,7 @@ function validSettings(s) {
   return s && typeof s === "object" && /^https:\/\/[^/\s]+$/i.test(s.url || "") && s.key && s.token;
 }
 
-// bin/new-wiki and "Copy setup link" put the settings in the fragment, which
+// bin/setup and "Copy setup link" put the settings in the fragment, which
 // browsers never send to the server: #setup=<base64url of {"url","key","token"}>.
 function setupLink() {
   const json = JSON.stringify({ url: settings.url, key: settings.key, token: settings.token });
@@ -67,9 +68,15 @@ function setupLink() {
 }
 
 function readSetupLink() {
-  const match = location.hash.match(/^#setup=([A-Za-z0-9_-]+)$/);
-  if (!match) return null;
+  if (!/^#setup=/.test(location.hash)) return null;
+  const hash = location.hash;
   history.replaceState(null, "", location.pathname + location.search);  // drop the token from the address bar
+  return parseSetupLink(hash);
+}
+
+function parseSetupLink(text) {
+  const match = String(text).match(/#setup=([A-Za-z0-9_-]+)/);
+  if (!match) return null;
   try {
     const s = JSON.parse(atob(match[1].replace(/-/g, "+").replace(/_/g, "/")));
     s.url = projectUrl(String(s.url || ""));
@@ -86,6 +93,7 @@ function readSetupLink() {
 async function readShared() {
   const params = new URLSearchParams(location.search);
   if (params.has("share")) {
+    fromShare = true;
     history.replaceState(null, "", location.pathname);
     try {
       const cache = await caches.open(SHARE_CACHE);
@@ -369,8 +377,9 @@ function finish(message) {
   status(message, "ok");
   resetCapture();
   renderQueue();
-  if (window.name === POPUP) setTimeout(() => window.close(), 1200);  // opened by the bookmarklet
-  else flush();
+  flush();
+  // Opened by the bookmarklet or from the share sheet: close and go back to where you were.
+  if (window.name === POPUP || fromShare) setTimeout(() => window.close(), 900);
 }
 
 function onSettings(event) {
@@ -393,6 +402,15 @@ function onSettings(event) {
 function bind() {
   $("capture").addEventListener("submit", onCapture);
   $("settings").addEventListener("submit", onSettings);
+  $("s-link").addEventListener("input", () => {
+    const s = parseSetupLink($("s-link").value);
+    if (!s) return;
+    $("s-url").value = s.url;
+    $("s-key").value = s.key;
+    $("s-token").value = s.token;
+    $("s-link").value = "";
+    $("settings").requestSubmit();
+  });
   $("intents").addEventListener("change", updateGrowHint);
   $("note").addEventListener("input", updateGrowHint);
   $("note").addEventListener("keydown", (e) => {

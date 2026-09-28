@@ -60,7 +60,7 @@ DESIGN_MD_LINT=1 python -m unittest discover tests   # also the DESIGN.md spec l
 - `db/supabase.sql`: the inbox schema and functions.
 - `templates/wiki-repo/`: what a user's private wiki repository starts from.
 - `shortcut/`: the shareable Shortcut and its generator.
-- `bin/new-wiki`: one-command setup of a user's wiki repository, secrets and
+- `bin/setup`: one-command setup of a user's wiki repository, secrets and
   Supabase inbox. Standard library only, since it runs before the virtualenv.
 
 ## Guidelines
