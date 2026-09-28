@@ -302,7 +302,7 @@ def main():
     step("Inbox")
     print("    Where captures wait before they're filed:\n"
           "      github    a small private inbox repository next to the wiki (nothing else to sign up for)\n"
-          "      supabase  a free Supabase project (needed by the iPhone and Mac Shortcut for now)")
+          "      supabase  a free Supabase project")
     kind = args.inbox or ask("Inbox", default="github").lower()
     if kind not in ("github", "supabase"):
         fail(f"unknown inbox {kind!r}: use github or supabase")
@@ -432,9 +432,10 @@ def main():
     (the token is also INBOX_TOKEN in {args.env_file.name}; keep it private)
 """
     else:
-        devices += """  • iPhone: the page works in Safari (paste a link or choose an image), but
-    only the Shortcut shows up in the share sheet, and it needs the Supabase inbox
-    for now.
+        devices += f"""  • iPhone or Mac: open "{ENGINE / 'shortcut' / 'Save to second-brain (GitHub inbox).shortcut'}"
+    and answer its questions with:
+      Inbox repository       {inbox_repo}
+      Capture token          the token you just pasted
 """
     print(f"""
 Done: https://github.com/{repo}
