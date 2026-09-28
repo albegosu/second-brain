@@ -17,13 +17,17 @@ is rough priority.
 - ~~**X, completely.**~~ Done: X Articles are read as text, a post without media
   uses its quoted post's media or the page it links to, and a capture with
   nothing to read fails and asks for a note instead of being guessed.
+- ~~**Android and desktop.**~~ Done: an installable capture page (`web/`, on
+  GitHub Pages) that shows up in Android's share sheet and works in any desktop
+  browser, with a bookmarklet, pasted or dropped images and captures kept on the
+  device while offline. It calls the same Supabase functions as the Shortcut.
+  Native apps wait for demand: [#32](https://github.com/albegosu/second-brain/issues/32).
 - **Images shared directly.** Engine done: a bare image (a screenshot or photo,
   no URL) is filed like any other capture, identified by its content hash, and
   when it holds no interface pattern its text is read by the VLM (the OCR step) so
   it can still yield ideas. It arrives base64-encoded through the inbox
   (`capture_image` on Supabase or the local inbox) or `python -m worker.run
-  --image`. Still open: wiring it into the Shortcut so a share-sheet image uploads
-  straight from the phone.
+  --image`, and the Shortcut and the capture page send share-sheet images to it.
   *Inspired by mymind and Karakeep.*
 - **Real DOM and CSS for web UI.** For a live web page, capture the actual
   elements and computed styles instead of a screenshot, so style notes carry
