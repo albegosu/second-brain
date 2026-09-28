@@ -8,7 +8,8 @@ and turns your taste into a DESIGN.md your coding agent builds from.**
 </p>
 
 - **Save from anywhere.** Share a post from X, Instagram or LinkedIn, any web page,
-  a screenshot or a photo, from your iPhone or Mac.
+  a screenshot or a photo, from your iPhone or Mac (Shortcut) or from Android and
+  any desktop browser ([capture page](#android-and-desktop)).
 - **Curated, not dumped.** A vision model reads the frames, measures the palette
   from pixels and files each capture under a topic: design, features, tools or
   practices. Code counts your recurring choices into a taste profile.
@@ -21,7 +22,7 @@ and turns your taste into a DESIGN.md your coding agent builds from.**
 ## How it works
 
 A memory for things worth keeping: interface patterns and styles, feature ideas
-and tools. You share something from your iPhone or Mac. A model analyzes it,
+and tools. You share something from your phone or computer. A model analyzes it,
 files it under a topic and merges it into a Markdown wiki kept in a separate
 private repository. Claude then reads it through the `second-brain` skill before
 designing or building something. This repository is the engine.
@@ -30,18 +31,19 @@ What sets it apart and where it's going: [PRODUCT.md](PRODUCT.md) ·
 [ROADMAP.md](ROADMAP.md).
 
 ```
-Shortcut ──► Supabase (inbox) ──► GitHub Actions (worker + Ollama Cloud) ──► wiki repository
-                                          │                                       │
-                                          ▼                                  git pull on the Mac
-                                  ntfy push to the phone                          ▼
-                                                                         second-brain skill
+Shortcut or capture page ──► Supabase (inbox) ──► GitHub Actions (worker + Ollama Cloud) ──► wiki repository
+                                                     │                                       │
+                                                     ▼                                  git pull on the Mac
+                                             ntfy push to the phone                          ▼
+                                                                                    second-brain skill
 ```
 
 ## Quick start
 
 You need a GitHub account with [gh](https://cli.github.com) logged in, a free
 [Supabase](https://supabase.com) project, an [Ollama](https://ollama.com) API key
-and an iPhone or Mac with Shortcuts.
+and an iPhone or Mac with Shortcuts, or an Android phone or any computer with a
+browser.
 
 1. Get the engine:
 
@@ -58,8 +60,10 @@ and an iPhone or Mac with Shortcuts.
    bin/new-wiki
    ```
 
-3. Open `shortcut/Save to second-brain.shortcut` and answer its three questions
-   with the values `bin/new-wiki` prints at the end.
+3. Connect a device with what `bin/new-wiki` prints at the end. On an iPhone or
+   Mac, open `shortcut/Save to second-brain.shortcut` and answer its three
+   questions. On Android or a computer, open the printed setup link and install
+   the [capture page](#android-and-desktop).
 4. Optionally, subscribe to the printed topic in the [ntfy](https://ntfy.sh) app
    to get a push when each capture is filed.
 5. Share a post or a page. A few minutes later it's in your wiki, and Claude
@@ -358,6 +362,36 @@ The note is worth it: it goes into the prompt and improves the analysis a lot,
 because you know what caught your eye and the model doesn't. A note can also
 start with `intent: Tool to try —` (or any of the menu's intents) when you build
 the Shortcut by hand.
+
+## Android and desktop
+
+The capture page does what the Shortcut does, for Android and any desktop
+browser: [albegosu.github.io/second-brain/](https://albegosu.github.io/second-brain/). It's a static page (in
+[`web/`](web)) that calls the same Supabase functions, so nothing changes on the
+server.
+
+- **Connect it:** open the setup link `bin/new-wiki` prints, or enter the same
+  three values as the Shortcut (Supabase project URL, publishable key, capture
+  token). They're kept in that browser's storage and sent only to your Supabase
+  project. The setup link carries them in the URL fragment, which browsers never
+  send to a server; the page removes it from the address bar once it's read.
+  **Copy setup link** in Settings makes one to connect another device.
+- **Android:** open the page in Chrome and install it (⋮ → **Install app** or
+  **Add to Home screen**). It then shows up in the share sheet of every app, for
+  links, text with a link in it (what LinkedIn and Instagram share) and images.
+- **Desktop:** paste a link, or paste, drop or choose an image. Settings has a
+  **Save to second-brain** bookmarklet for the bookmarks bar: on any page it opens
+  a small window with that page's link, and closes it once it's sent.
+- **Same flow as the Shortcut:** it asks what caught your eye and for an optional
+  note, and sends `intent: … — note`. Images are converted to JPEG (at most
+  2560 px on the long side) and sent to `capture_image`.
+- **Offline or paused project:** a capture that can't be sent waits in the
+  browser and is retried when you open the page again or come back online.
+
+It's served by GitHub Pages from this repository (`.github/workflows/pages.yml`).
+To host your own copy, publish `web/` anywhere with HTTPS; the page has no build
+step and loads nothing from other sites. The local inbox isn't supported: a page
+served over HTTPS can't call `http://<mac>.local`.
 
 ## hypar
 

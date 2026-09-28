@@ -63,9 +63,10 @@ agent memory tools), none of them did the following. This is the product.
    code from measured palettes and traits. getdesign.md gives you Stripe's
    DESIGN.md; second-brain gives you yours.
 8. **Capture without an app, processing without a computer, at zero cost.** A
-   system Shortcut on iOS and macOS, a free Supabase inbox, GitHub Actions and the
-   Ollama Cloud free plan. Nothing to install on the phone and nothing that needs
-   your laptop to be on.
+   system Shortcut on iOS and macOS, an installable web page on Android and
+   desktop, a free Supabase inbox, GitHub Actions and the Ollama Cloud free plan.
+   Nothing to install from an app store and nothing that needs your laptop to be
+   on.
 
 ## Principles
 
