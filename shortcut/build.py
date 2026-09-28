@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Builds the shareable "Save to second-brain" Shortcut.
 
-    python shortcut/build.py                     # signed shortcut/Save to second-brain.shortcut (macOS)
-    python shortcut/build.py --unsigned out.plist  # only the unsigned workflow, to inspect it
+    python shortcut/build.py                     # both signed Shortcuts (macOS)
+    python shortcut/build.py --unsigned out.plist  # only the unsigned workflows, to inspect them
+
+Two files: "Save to second-brain.shortcut" for the Supabase inbox and
+"Save to second-brain (GitHub inbox).shortcut" for the GitHub inbox.
 
 Shortcuts only imports signed files and only macOS can sign them (`shortcuts
 sign`). The file stores nothing personal: on import, Shortcuts asks for the
@@ -22,7 +25,9 @@ import tempfile
 import uuid
 from pathlib import Path
 
-OUTPUT = Path(__file__).resolve().parent / "Save to second-brain.shortcut"
+HERE = Path(__file__).resolve().parent
+OUTPUTS = {"supabase": HERE / "Save to second-brain.shortcut",
+           "github": HERE / "Save to second-brain (GitHub inbox).shortcut"}
 OBJECT = "￼"  # where a variable sits inside a text field
 
 
@@ -153,6 +158,11 @@ def build() -> dict:
         ("sb_publishable_...", "Your Supabase publishable key (starts with sb_publishable_)"),
         ("<capture token>", "Your capture token: the INBOX_TOKEN whose sha256 you registered in Supabase"),
     ]
+    return shell(actions, questions)
+
+
+def shell(actions: list[dict], questions: list[tuple[str, str]]) -> dict:
+    """The workflow around the actions: share sheet input and import questions."""
     return {
         "WFWorkflowClientVersion": "2605.0.5",
         "WFWorkflowMinimumClientVersion": 900,
@@ -172,22 +182,105 @@ def build() -> dict:
     }
 
 
+def build_github() -> dict:
+    """The same Shortcut for the GitHub inbox: each capture becomes a JSON file in
+    queue/ of the inbox repository, written through the GitHub contents API (the
+    file's content goes base64-encoded), and the push starts the inbox workflow."""
+    repo = action("gettext", WFTextActionText=text("<you>/second-brain-wiki-inbox"))
+    token = action("gettext", WFTextActionText=text("github_pat_..."))
+    urls = action("detect.link", WFInput=text({"Type": "ExtensionInput"}))
+    first = action("getitemfromlist", WFInput=attachment(output(urls, "URLs")), WFItemSpecifier="First Item")
+    marker = action("gettext", WFTextActionText=text(output(first, "Item from List"), "SBNOURL"))
+    intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"])
+    intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
+                    WFChooseFromListActionPrompt="What caught your eye?")
+    note = action("ask", WFAskActionPrompt="What do you want from this? For Idea to grow, the thought it gave you (optional)", WFInputType="Text")
+    # A random file name; the worker files the queue in name order.
+    name = action("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
+
+    def note_body():
+        return text("intent: ", output(intent, "Chosen Item"), " — ", output(note, "Provided Input"))
+
+    def put(file: dict) -> dict:
+        b64 = action("base64encode", WFInput=attachment(output(file, "Dictionary")), WFEncodeMode="Encode",
+                     WFBase64LineBreakMode="None")
+        req = action(
+            "downloadurl",
+            WFURL=text("https://api.github.com/repos/", output(repo, "Text"), "/contents/queue/sc-",
+                       output(name, "Random Number"), ".json"),
+            WFHTTPMethod="PUT", ShowHeaders=True, WFHTTPBodyType="JSON",
+            WFHTTPHeaders=dictionary(Authorization=text("Bearer ", output(token, "Text")),
+                                     Accept=text("application/vnd.github+json")),
+            WFJSONValues=dictionary(message=text("capture"), content=text(output(b64, "Base64 Encoded"))),
+        )
+        return b64, req
+
+    def confirm(req: dict, ok_message: str) -> list[dict]:
+        """GitHub answers a created file with a commit; an error has only a message.
+        Empty-value tests are unreliable, so a sentinel again: no commit sha → ✗."""
+        commit = action("getvalueforkey", WFInput=attachment(output(req, "Contents of URL")),
+                        WFDictionaryKey="commit", WFGetDictionaryValueType="Value")
+        sha = action("getvalueforkey", WFInput=attachment(output(commit, "Dictionary Value")),
+                     WFDictionaryKey="sha", WFGetDictionaryValueType="Value")
+        check = action("gettext", WFTextActionText=text(output(sha, "Dictionary Value"), "SBNOSHA"))
+        group = str(uuid.uuid4()).upper()
+        return [
+            commit, sha, check,
+            action("conditional", GroupingIdentifier=group, WFControlFlowMode=0, WFCondition=4,
+                   WFConditionalActionString="SBNOSHA",
+                   WFInput={"Type": "Variable", "Variable": attachment(output(check, "Text", "WFStringContentItem"))}),
+            action("notification", WFNotificationActionBody=text("✗ Couldn't send: ", output(req, "Contents of URL"))),
+            action("conditional", GroupingIdentifier=group, WFControlFlowMode=1),
+            action("notification", WFNotificationActionBody=text(ok_message)),
+            action("conditional", GroupingIdentifier=group, WFControlFlowMode=2),
+        ]
+
+    firstimg = action("getitemfromlist", WFInput=attachment({"Type": "ExtensionInput"}), WFItemSpecifier="First Item")
+    jpg = action("image.convert", WFInput=attachment(output(firstimg, "Item from List")),
+                 WFImageFormat="JPEG", WFImageCompressionQuality=0.8)
+    img64 = action("base64encode", WFInput=attachment(output(jpg, "Converted Image")), WFEncodeMode="Encode",
+                   WFBase64LineBreakMode="None")
+    img_file = action("dictionary", WFItems=dictionary(image=text(output(img64, "Base64 Encoded")),
+                                                       mime=text("image/jpeg"), note=note_body()))
+    img_b64, img_put = put(img_file)
+    url_file = action("dictionary", WFItems=dictionary(url=text(output(first, "Item from List")), note=note_body()))
+    url_b64, url_put = put(url_file)
+
+    outer = str(uuid.uuid4()).upper()
+    actions = [
+        repo, token, urls, first, marker, intents, intent, note, name,
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=0, WFCondition=4,
+               WFConditionalActionString="SBNOURL",
+               WFInput={"Type": "Variable", "Variable": attachment(output(marker, "Text", "WFStringContentItem"))}),
+        firstimg, jpg, img64, img_file, img_b64, img_put, *confirm(img_put, "✓ Image sent to second-brain"),
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=1),
+        url_file, url_b64, url_put, *confirm(url_put, "✓ Sent to second-brain"),
+        action("conditional", GroupingIdentifier=outer, WFControlFlowMode=2),
+    ]
+    questions = [
+        ("<you>/second-brain-wiki-inbox", "Your inbox repository, like you/second-brain-wiki-inbox"),
+        ("github_pat_...", "Your capture token: the fine-grained GitHub token for the inbox repository"),
+    ]
+    return shell(actions, questions)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--unsigned", type=Path, help="write the unsigned workflow here and stop")
+    ap.add_argument("--unsigned", type=Path, help="write the unsigned workflows next to this path and stop")
     args = ap.parse_args()
-    workflow = plistlib.dumps(build(), fmt=plistlib.FMT_BINARY)
-    if args.unsigned:
-        args.unsigned.write_bytes(workflow)
-        print(args.unsigned)
-        return
-    with tempfile.TemporaryDirectory() as tmp:
-        unsigned = Path(tmp) / "unsigned.shortcut"
-        unsigned.write_bytes(workflow)
-        subprocess.run(["shortcuts", "sign", "--mode", "anyone", "--input", str(unsigned), "--output", str(OUTPUT)],
-                       check=True)
-    print(OUTPUT)
-
+    for kind, builder in (("supabase", build), ("github", build_github)):
+        workflow = plistlib.dumps(builder(), fmt=plistlib.FMT_BINARY)
+        if args.unsigned:
+            out = args.unsigned.with_name(f"{args.unsigned.stem}-{kind}{args.unsigned.suffix}")
+            out.write_bytes(workflow)
+            print(out)
+            continue
+        with tempfile.TemporaryDirectory() as tmp:
+            unsigned = Path(tmp) / "unsigned.shortcut"
+            unsigned.write_bytes(workflow)
+            subprocess.run(["shortcuts", "sign", "--mode", "anyone", "--input", str(unsigned),
+                            "--output", str(OUTPUTS[kind])], check=True)
+        print(OUTPUTS[kind])
 
 if __name__ == "__main__":
     main()

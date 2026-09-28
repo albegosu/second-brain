@@ -32,7 +32,7 @@ What sets it apart and where it's going: [PRODUCT.md](PRODUCT.md) ·
 
 ```
 capture page ──► inbox repository (queue/) ──► GitHub Actions (worker + model) ──► wiki repository
- (or Shortcut ──► Supabase inbox)
+ or Shortcut        (or Supabase inbox)
                                                      │                                       │
                                                      ▼                                  git pull on the Mac
                                              ntfy push to the phone                          ▼
@@ -43,9 +43,8 @@ capture page ──► inbox repository (queue/) ──► GitHub Actions (worke
 
 You need a GitHub account with [gh](https://cli.github.com) logged in and an API
 key for the model: a free [Ollama](https://ollama.com) key by default, or
-OpenAI, Anthropic, Gemini or OpenRouter. Capture from an Android phone or any
-computer with a browser; the iPhone and Mac Shortcut needs the Supabase inbox
-([below](#two-inboxes)).
+OpenAI, Anthropic, Gemini or OpenRouter. Capture from an iPhone or Mac with
+Shortcuts, an Android phone or any computer with a browser.
 
 1. Get the engine:
 
@@ -64,8 +63,10 @@ computer with a browser; the iPhone and Mac Shortcut needs the Supabase inbox
 
    It stops once to let you create a capture token on GitHub (a page it opens
    for you: select only the inbox repository, Contents: Read and write).
-3. Scan the QR code it prints with your phone, or open the link on a computer,
-   and install the [capture page](#android-and-desktop).
+3. Connect your devices with what it prints: on an iPhone or Mac, open
+   `shortcut/Save to second-brain (GitHub inbox).shortcut` and answer its two
+   questions; on Android or a computer, scan the QR code (or open the link) and
+   install the [capture page](#android-and-desktop).
 4. Optionally, subscribe to the printed topic in the [ntfy](https://ntfy.sh) app
    to get a push when each capture is filed.
 5. Share a post or a page. A few minutes later it's in your wiki, and Claude
@@ -331,13 +332,21 @@ Captures wait in an inbox until the worker files them. `bin/setup` asks which:
   new one and paste it in the page's Settings.
 - **Supabase** (`bin/setup --inbox supabase`): a free Supabase project whose
   functions queue captures behind a capture-only token. With a Supabase access
-  token, `bin/setup` creates the project and its database. The iPhone and Mac
-  Shortcut only speaks to this inbox for now.
+  token, `bin/setup` creates the project and its database.
+
+Each inbox has its own Shortcut: `Save to second-brain.shortcut` for Supabase
+and `Save to second-brain (GitHub inbox).shortcut` for GitHub, which asks for
+the inbox repository and the capture token and writes the capture as a file in
+`queue/`.
 
 ## The Shortcut
 
-A single one: Shortcuts is the same app on iOS and macOS and syncs over iCloud.
-It shows up in the share sheet on the iPhone and on the Mac.
+Shortcuts is the same app on iOS and macOS and syncs over iCloud, so one
+Shortcut covers the iPhone and the Mac share sheet. There's one file per inbox:
+this section describes the Supabase one; the GitHub one,
+[Save to second-brain (GitHub inbox).shortcut](shortcut/Save%20to%20second-brain%20(GitHub%20inbox).shortcut),
+asks for the inbox repository and the capture token instead and has the same
+menu, note and image handling.
 
 **Install it:** download
 [Save to second-brain.shortcut](shortcut/Save%20to%20second-brain.shortcut) and
