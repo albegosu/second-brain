@@ -100,15 +100,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A queue
           git diff --cached --quiet || git commit -q -m "chore: filed queued captures"
+          pushed=""
           for try in 1 2 3; do
             git fetch -q origin main
-            if [ -z "$(git ls-tree --name-only origin/main queue/ | grep -v '^queue/.gitkeep$')" ] && \
-               [ -z "$(git ls-tree --name-only HEAD queue/ | grep -v '^queue/.gitkeep$')" ]; then
-              tree=$(git rev-parse HEAD^{tree})
-              fresh=$(git commit-tree "$tree" -m "chore: empty inbox")
-              git push -q --force-with-lease=main:"$(git rev-parse origin/main)" origin "$fresh":main && exit 0
-            else
-              git rebase -q origin/main && git push -q origin HEAD:main && exit 0
-            fi
+            git rebase -q origin/main && git push -q origin HEAD:main && { pushed=1; break; }
           done
-          echo "::warning::couldn't update the inbox; the next run tidies it"
+          [ -n "$pushed" ] || { echo "::warning::couldn't update the inbox; the next run tidies it"; exit 0; }
+          git fetch -q origin main
+          if [ -z "$(git ls-tree --name-only origin/main queue/ | grep -v '^queue/.gitkeep$')" ]; then
+            fresh=$(git commit-tree "origin/main^{tree}" -m "chore: empty inbox")
+            git push -q --force-with-lease=main:"$(git rev-parse origin/main)" origin "$fresh":main \
+              || echo "a capture arrived meanwhile: the history is trimmed next time"
+          fi
