@@ -461,14 +461,13 @@ def push_new_repo(folder: Path, repo: str, message: str, description: str):
 def check_capture_token(token: str, inbox_repo: str, wiki_repo: str) -> str | None:
     """None if the token can write to the inbox and can't see the wiki."""
     def status(repo: str) -> tuple[int, dict]:
-        request = urllib.request.Request(f"https://api.github.com/repos/{repo}", headers={
-            "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
-            "User-Agent": "second-brain-setup"})
-        try:
-            with urllib.request.urlopen(request, timeout=30) as r:
-                return r.status, json.loads(r.read())
-        except urllib.error.HTTPError as e:
-            return e.code, {}
+        # Through gh with the token as GH_TOKEN: no certificate setup needed in Python.
+        r = subprocess.run(["gh", "api", f"repos/{repo}"], capture_output=True, text=True,
+                           env={**os.environ, "GH_TOKEN": token, "GH_HOST": "github.com"})
+        if r.returncode == 0:
+            return 200, json.loads(r.stdout or "{}")
+        m = re.search(r"HTTP (\d{3})", r.stderr)
+        return int(m.group(1)) if m else 0, {}
     code, data = status(inbox_repo)
     if code == 401:
         return "GitHub doesn't accept that token."
