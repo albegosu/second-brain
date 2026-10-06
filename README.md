@@ -196,9 +196,12 @@ from the same test wiki and styled with that style's DESIGN.md:
 `python docs/readme/build_flow.py`.
 
 **Usage log.** When Claude builds something that takes from the wiki, the skill
-records it with `python -m worker.used <capture numbers> --project … --what …`.
-Lines go to `wiki/usage.md` by capture number, and the index shows how often each
-topic was used, so what proves useful stands out from what was only saved.
+records it with `python -m worker.used <capture numbers> --project … --what …
+--ref <commit or PR URL>`. Lines go to `wiki/usage.md` by capture number, and the
+index shows how often each topic was used, so what proves useful stands out from
+what was only saved. A save the agent only read isn't logged, and `--ref` links
+the line to the change it shaped, so a credit can be checked by opening the diff;
+the index counts those uses as verifiable.
 
 ## What it understands
 

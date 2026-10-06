@@ -43,10 +43,12 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 - Steps, animated properties and easing come from a vision model looking at frames. They are good starting points. Durations are usually omitted on purpose, because they cannot be measured from stills.
 - Palettes in source notes are measured from pixels but include the demo's content colors. Pick the UI ones.
 - Adapt to the project's own design tokens and stack. The wiki never stores code.
-- When something you built actually takes from captures (not when you only looked), record it once, at the end, with their capture numbers (the `0007` in `sources/2026-09/0007-….md`). It shows the user which saves turn out useful:
+- When something you built actually takes from captures, record it once, at the end, with their capture numbers (the `0007` in `sources/2026-09/0007-….md`). It shows the user which saves turn out useful. A save you only read or looked at is not logged, even if it informed your thinking.
   ```bash
-  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.used 7 21 --project "<repository or product>" --what "<what was taken, in one line>"
+  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.used 7 21 --project "<repository or product>" --what "<what was taken, in one line>" --ref "<commit or pull request URL>"
   ```
+  - Whenever the work lands as a commit or a pull request, pass its URL as `--ref`, so the credit can be checked by opening the diff; the index counts those uses as verifiable. Record after pushing, once the URL exists. Leave `--ref` out only when nothing was committed.
+  - In a private repository you may also list the captures a change takes from (numbers and topic names) in its PR description. Never in a public repository: they come from the user's private wiki.
 
 ## Adding to it
 
