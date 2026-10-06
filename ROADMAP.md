@@ -73,7 +73,8 @@ is rough priority.
 - ~~**Taste profile.**~~ Done: `worker/taste.py`, after each lint pass. Counts by
   code, a default look and motion written from them.
 - ~~**Usage log.**~~ Done: `worker/used.py` records which captures shaped a build;
-  the index shows uses per topic.
+  the index shows uses per topic. `--ref` links each line to the commit or pull
+  request it shaped, and the index counts those as verifiable.
 - **Topic hierarchy.** When a category grows, group topics into clusters and
   subtopics so the index stays scannable in one read.
   *Inspired by ContextBolt's topic clusters.*
