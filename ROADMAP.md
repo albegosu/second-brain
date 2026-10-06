@@ -61,8 +61,9 @@ is rough priority.
   format. Code derives the tokens (color roles tuned to WCAG AA, a font per type
   family, radius and spacing scales, components); a model only writes prose. It
   passes the spec's linter with no errors or warnings, and the skill builds from
-  it. Still open: variants for the other looks of a topic, and a dark and light
-  pair when the taste splits between them.
+  it. Also done: `--look` builds any look of a multi-look topic, the taste comes
+  as a light and dark pair when the captures split between them, and a primary
+  that may be a photo's color is marked low confidence.
   *getdesign.md gives you Stripe's DESIGN.md; this gives you yours.*
 - ~~**Ideas from what you read.**~~ Done: a `practices` category; articles and
   long texts get their key ideas extracted, and topic pages list them with claim,

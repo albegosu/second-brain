@@ -125,7 +125,7 @@ def evidence() -> dict:
             colors = re.findall(r"`(#[0-9a-f]{6})`( \(accent\))?", m.group(1))
             if colors:
                 c["background"][tone(colors[0][0])] += 1  # the largest neutral area
-            for h in {hue(x) for x, accent in colors if accent}:
+            for h in dict.fromkeys(hue(x) for x, accent in colors if accent):  # once each, in palette order
                 c["accent"][h] += 1
 
         seen = Counter()  # per capture, so a video with six patterns doesn't count six times

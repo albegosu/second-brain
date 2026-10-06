@@ -2,7 +2,9 @@
 """DESIGN.md: the owner's taste, or one saved style, as design tokens an agent follows.
 
     python -m worker.design_md                          # rewrite wiki/DESIGN.md from the taste and commit it
+    python -m worker.design_md --tone dark              # the taste's dark variant, printed
     python -m worker.design_md --style editorial        # one style topic (design/style-editorial), printed
+    python -m worker.design_md --style editorial --look "Night Edition"   # one of its looks
     python -m worker.design_md --style editorial --out ~/code/app/DESIGN.md
     python -m worker.design_md --dry-run                # print the derived tokens and change nothing
     python -m worker.design_md --no-model               # template prose, no model call
@@ -18,10 +20,20 @@ writes the overview and the do's and don'ts, so a bad answer can at most spoil
 the prose; without a model a template writes them. The taste's DESIGN.md is
 refreshed after the weekly lint pass, next to taste.md.
 
-A style topic can hold several looks. Its DESIGN.md describes the dominant one:
-each trait takes the value most of its captures share (the newest capture breaks
-a tie), and the colors come from the one capture that matches those traits best
+When the captures split between light and dark backgrounds with no clear lead,
+the taste gets a pair: wiki/DESIGN.md for the more frequent tone and
+wiki/DESIGN.<tone>.md for the other, with the same type, shapes and spacing and
+color roles measured on each tone's own captures.
+
+A style topic can hold several looks, one "### Name [n]" block each. Its
+DESIGN.md describes the dominant one unless --look names another: each trait
+takes the value most of the look's captures share (the newest capture breaks a
+tie), and the colors come from the one capture that matches those traits best
 (the newest on a tie), so palettes of different looks are never mixed.
+
+Measured palettes include content colors, so the primary is a guess when no
+accent is vivid, or when the words the wiki uses for the look name other hues.
+The DESIGN.md then says so and asks to check the capture's frames.
 """
 from __future__ import annotations
 
@@ -157,6 +169,56 @@ def vivid(hex_: str) -> bool:
     Palettes include content colors, so a muted accent is often a picture's."""
     _, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb(hex_)))
     return s >= 0.6 and v >= 0.55
+
+
+def accent_rank(hex_: str) -> int:
+    """0 vivid, 1 clear, 2 muted or dark. A muted or dark "accent" is more often a
+    photo's shade or a tinted dark surface than a color the interface chose."""
+    _, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb(hex_)))
+    return 0 if vivid(hex_) else 1 if s >= 0.35 and v >= 0.35 else 2
+
+
+# Color words a model uses for a look, as taste.hue() names: a measured primary
+# whose hue the wiki never mentions is probably a content color.
+HUE_WORDS = {
+    "red": "red", "crimson": "red", "scarlet": "red", "coral": "red", "cherry": "red",
+    "orange": "orange", "amber": "orange", "rust": "orange", "terracotta": "orange", "copper": "orange",
+    "yellow": "yellow", "gold": "yellow", "golden": "yellow", "mustard": "yellow",
+    "green": "green", "lime": "green", "mint": "green", "emerald": "green", "olive": "green",
+    "teal": "cyan", "cyan": "cyan", "turquoise": "cyan", "aqua": "cyan",
+    "blue": "blue", "navy": "blue", "cobalt": "blue", "azure": "blue", "indigo": "blue",
+    "purple": "purple", "violet": "purple", "lilac": "purple", "lavender": "purple", "plum": "purple",
+    "pink": "pink", "magenta": "pink", "fuchsia": "pink", "rose": "pink",
+}
+HUE_RING = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
+
+
+def named_hues(text: str) -> set[str]:
+    """The hues a description names, hex codes left out."""
+    text = re.sub(r"#[0-9a-f]{3,8}\b", " ", text.lower())
+    return {HUE_WORDS[w] for w in re.findall(r"[a-z]+", text) if w in HUE_WORDS}
+
+
+def near_hues(name: str) -> set[str]:
+    """A hue and its neighbors: where one hue ends and the next begins is a matter of words."""
+    i = HUE_RING.index(name)
+    return {HUE_RING[i - 1], name, HUE_RING[(i + 1) % len(HUE_RING)]}
+
+
+def doubts(primary: str, measured: bool, described: set[str]) -> list[str]:
+    """Why the primary may not be a color the interface chose, if it may not.
+    measured: primary is a measured accent, not the ink of a palette with none."""
+    hues = listed(sorted(described))
+    if not measured:
+        return [f"the measured palette has no accent, but the wiki describes the look in {hues}"] if described else []
+    out = []
+    if not vivid(primary):
+        dark = colorsys.rgb_to_hsv(*(c / 255 for c in rgb(primary)))[2] < 0.45
+        out.append("no measured accent is vivid, so it may be a shade from an image"
+                   + (" or a tinted dark surface" if dark else ""))
+    if described and not near_hues(taste.hue(primary)) & described:
+        out.append(f"the wiki describes the look in {hues} and the primary is {taste.hue(primary)}")
+    return out
 
 
 def hue_gap(a: str, b: str) -> float:
@@ -296,11 +358,28 @@ def majority(values: list[str | None], fallback: str | None) -> tuple[str | None
     return value, f"{top} of {len(values)} capture{'' if len(values) == 1 else 's'}"
 
 
-def taste_design() -> dict | None:
+def tone_path(tone: str) -> str:
+    return f"DESIGN.{tone}.md"
+
+
+def second_tone(background: Counter) -> str | None:
+    """The background tone that gets its own taste DESIGN.md next to the main one:
+    when no tone clearly leads, the other of light and dark, if enough captures
+    have it."""
+    if taste.lead(background):
+        return None
+    first, _ = choose(background)
+    other = max((t for t in ("light", "dark") if t != first), key=lambda t: background[t])
+    return other if background[other] >= taste.MIN_LOOKS else None
+
+
+def taste_design(tone: str | None = None) -> dict | None:
     """The owner's default look: taste.md's counts for the traits. Colors come from
-    the design captures with the leading background tone: the neutrals of the one
-    whose page color is the most typical (one palette, so they belong together),
-    and the most typical shade of the leading accent hue."""
+    the design captures with the leading background tone (or the tone asked for):
+    the neutrals of the one whose page color is the most typical (one palette, so
+    they belong together), and the most typical shade of the leading accent hue.
+    When the captures split between light and dark (second_tone), each tone's
+    accent hue is counted on its own captures, so the pair differs only in color."""
     ev = taste.evidence()
     if ev["looks"] < taste.MIN_LOOKS:
         return None
@@ -308,24 +387,33 @@ def taste_design() -> dict | None:
     traits = {"typography": choose(c["typography"])}
     traits.update({k: choose(c[k], DEFAULTS[k], k) for k in ("radius", "spacing", "depth", "motion_feel")})
 
+    main, tone_why = choose(c["background"])
+    other = second_tone(c["background"])
+    if tone not in (None, main, other):
+        return None
+    tone = tone or main
     mine = [look for look in looks() if look["category"] in taste.LOOK_CATEGORIES and look["neutrals"]]
-    tone, tone_why = choose(c["background"])
     backgrounds = [look for look in mine if taste.tone(look["neutrals"][0]) == tone] or mine
     page = medoid([look["neutrals"][0] for look in backgrounds]) if backgrounds else None
     neutrals = next((look["neutrals"] for look in backgrounds if look["neutrals"][0] == page), [])
 
     def shade(hue):
-        """Each capture's largest accent of that hue, preferring vivid ones: their medoid."""
+        """Each capture's most likely UI accent of that hue (vivid first): the medoid of the best."""
         for group in (backgrounds, mine):  # an accent seen on the same kind of background first
-            found = [sorted((a for a in look["accents"] if taste.hue(a) == hue), key=lambda a: not vivid(a))[:1]
+            found = [sorted((a for a in look["accents"] if taste.hue(a) == hue), key=accent_rank)[:1]
                      for look in group]
             found = [a for first in found for a in first]
             if found:
-                return medoid([a for a in found if vivid(a)] or found)
+                best = min(map(accent_rank, found))
+                return medoid([a for a in found if accent_rank(a) == best])
         return None
 
-    hue, hue_why = choose(c["accent"])
-    accents = [a for a in (shade(h) for h in [hue] + [h for h, _ in c["accent"].most_common() if h != hue]) if a] \
+    paired = other is not None
+    # Once per capture, in palette order: a tie goes to the hue first seen as a larger accent.
+    hues = Counter(h for look in backgrounds for h in dict.fromkeys(map(taste.hue, look["accents"]))) if paired \
+        else c["accent"]
+    hue, hue_why = choose(hues)
+    accents = [a for a in (shade(h) for h in [hue] + [h for h, _ in hues.most_common() if h != hue]) if a] \
         if hue else []
     colors, origin = roles(neutrals, accents)
     origin = {role: "measured in the same capture as neutral" if how == "measured" else how
@@ -333,18 +421,29 @@ def taste_design() -> dict | None:
     if backgrounds:
         origin["neutral"] = (f"the most typical page color of the {len(backgrounds)} captures with a "
                              f"{taste.tone(colors['neutral'])} background ({tone_why})")
+    where = f"the {len(backgrounds)} {tone} captures" if paired else "the captures"
     if accents:
-        origin["primary"] = f"the most typical {hue} accent across the captures ({hue_why})"
+        origin["primary"] = f"the most typical {hue} accent across {where} ({hue_why})"
     if "tertiary" in colors:
         origin["tertiary"] = (f"the most typical {taste.hue(colors['tertiary'])} accent, the most frequent hue "
                               "that reads apart from primary")
 
     unsettled = [name for name, why in (("background tone", tone_why), ("accent hue", hue_why),
                                         *((k.replace("_", " "), v[1]) for k, v in traits.items()))
-                 if why.startswith("no ")]
-    return {"kind": "taste", "name": "Taste", "key": None,
-            "description": f"The default look across {ev['looks']} saved design captures, as design tokens.",
+                 if why.startswith("no ") and not (paired and name == "background tone")]
+    pair = None
+    if paired:
+        twin = other if tone == main else main
+        pair = {"tone": tone, "twin": twin, "path": PATH if tone == main else tone_path(tone),
+                "twin_path": PATH if twin == main else tone_path(twin),
+                "split": " · ".join(f"{t} {c['background'][t]}" for t in ("light", "dark"))}
+    description = (f"The default {tone} look across {ev['looks']} saved design captures, colors from the "
+                   f"{len(backgrounds)} with a {tone} background, as design tokens." if paired else
+                   f"The default look across {ev['looks']} saved design captures, as design tokens.")
+    return {"kind": "taste", "name": f"Taste ({tone})" if paired and tone != main else "Taste", "key": None,
+            "pair": pair, "description": description,
             "captures": [], "looks": ev["looks"], "traits": traits, "colors": colors, "origin": origin,
+            "doubts": doubts(colors["primary"], bool(accents), set()),
             "unsettled": unsettled, "evidence": taste.evidence_lines(ev, verdict=True),
             "counts": {k: tally(c[k]) for k in ("layout", "density", "easing", "property") if c[k]},
             "block": {}, "variants": []}
@@ -386,11 +485,33 @@ def style_blocks(body: str) -> list[dict]:
     return blocks
 
 
-def style_design(name: str) -> dict | None:
+def find_look(blocks: list[dict], name: str) -> dict | None:
+    """A look by its block name: the exact name, else the one name that contains it."""
+    want = wiki.slugify(name)
+    if exact := [b for b in blocks if wiki.slugify(b["name"]) == want]:
+        return exact[0]
+    partial = [b for b in blocks if want and want in wiki.slugify(b["name"])]
+    return partial[0] if len(partial) == 1 else None
+
+
+class NoLook(LookupError):
+    """--look names no look of the topic; the message lists the ones it has."""
+
+
+def style_design(name: str, look: str | None = None) -> dict | None:
     topic = find_style(name)
     if not topic:
         return None
-    mine = looks([wiki.WIKI / rel for rel in topic["sources"]])
+    blocks = style_blocks(wiki.read_page(wiki.WIKI / f"{topic['key']}.md")[1])
+    files = [wiki.WIKI / rel for rel in topic["sources"]]
+    chosen = None
+    if look:
+        chosen = find_look(blocks, look)
+        if not chosen:
+            raise NoLook(f"no look {look!r} in {topic['key']} (looks: "
+                         f"{'; '.join(b['name'] for b in blocks) or 'none'})")
+        files = [files[n - 1] for n in dict.fromkeys(chosen["cites"]) if 0 < n <= len(files)]
+    mine = looks(files)
     if not mine:
         return None
     traits = {k: majority([look["traits"].get(k) for look in mine], DEFAULTS.get(k))
@@ -399,21 +520,24 @@ def style_design(name: str) -> dict | None:
     anchor = max((look for look in mine if look["neutrals"] or look["accents"]),
                  key=lambda look: (sum(look["traits"].get(k) == v for k, (v, _) in traits.items()), look["capture"]),
                  default=mine[-1])
-    accents = sorted(anchor["accents"], key=lambda a: not vivid(a))  # stable: largest vivid first
+    accents = sorted(anchor["accents"], key=accent_rank)  # stable: largest of the best rank first
     colors, origin = roles(anchor["neutrals"], accents)
     for role, how in origin.items():
         if how == "measured":
             origin[role] = f"measured in capture #{anchor['capture']}"
 
-    blocks = style_blocks(wiki.read_page(wiki.WIKI / f"{topic['key']}.md")[1])
     # The block that cites the anchor capture, by its [n] in the topic's sources list.
     at = next((i for i, rel in enumerate(topic["sources"], 1) if wiki.capture_number(rel) == anchor["capture"]), None)
-    block = next((b for b in blocks if at in b["cites"]),
-                 blocks[0] if blocks else {"name": topic["title"], "fields": {}})
-    return {"kind": "style", "name": topic["title"], "key": topic["key"],
+    block = chosen or next((b for b in blocks if at in b["cites"]),
+                           blocks[0] if blocks else {"name": topic["title"], "fields": {}})
+    described = named_hues(" ".join(v for k, v in block["fields"].items() if k != "don't"))
+    title = topic["title"] if not chosen or wiki.slugify(block["name"]) == wiki.slugify(topic["title"]) \
+        else f"{topic['title']}: {block['name']}"
+    return {"kind": "style", "name": title, "key": topic["key"], "look": chosen["name"] if chosen else None,
             "description": strip_cites(topic["summary"]) or f"The look of the {topic['title']} topic.",
             "captures": [look["capture"] for look in mine], "looks": len(mine), "anchor": anchor["capture"],
             "traits": traits, "colors": colors, "origin": origin,
+            "doubts": doubts(colors["primary"], bool(accents), described),
             "unsettled": [k.replace("_", " ") for k, (_, why) in traits.items() if why.startswith("not ")],
             "evidence": [], "counts": {},
             "block": {k: strip_cites(v) for k, v in block["fields"].items() if k != "tokens"},
@@ -520,6 +644,9 @@ def facts(d: dict, tok: dict) -> str:
     if d["block"]:
         lines += ["", "The style as the wiki describes it:"]
         lines += [f"- {k}: {v}" for k, v in d["block"].items()]
+    if d.get("doubts"):
+        lines += ["", "Primary is a low-confidence pick: " + "; ".join(d["doubts"]) + ". Don't present it as the "
+                  "look's signature color."]
     return "\n".join(lines)
 
 
@@ -571,8 +698,9 @@ def template(d: dict) -> dict:
                          "frequent value, so follow the project where it has an opinion.")
         return {"overview": overview, "dos": [], "donts": []}
     b = d["block"]
-    overview = " ".join(x for x in (d["description"], b.get("composition"),
-                                    f"Use it for: {b['use it for']}" if b.get("use it for") else "") if x)
+    parts = [x.strip() for x in (d["description"], b.get("composition"),
+                                 f"Use it for: {b['use it for']}" if b.get("use it for") else "") if x and x.strip()]
+    overview = " ".join(x if x[-1] in ".!?" else x + "." for x in parts)
     if not b.get("composition"):
         overview += f" The look: {look}."
     return {"overview": re.sub(r"\s+", " ", overview).strip(), "dos": items(b.get("do", "")),
@@ -585,6 +713,10 @@ def guardrails(d: dict, tok: dict) -> tuple[list[str], list[str]]:
     c = d["colors"]
     dos, donts = ["Keep text at 4.5:1 or more on its background: on-surface and secondary are already "
                   "tuned to neutral and surface."], []
+    if d.get("doubts"):
+        where = f"capture #{d['anchor']}" if d.get("anchor") else "the captures"
+        dos.append(f"Check primary against the frames of {where} before you use it: it may not be a color the "
+                   "interface chose. If the reference shows another accent, use that one.")
     if c["primary"] != c["on-surface"]:
         dos.append("Keep primary for the one main action on a screen.")
         ratio = contrast(c["primary"], c["neutral"])
@@ -640,10 +772,12 @@ def render(d: dict, tok: dict, text: dict) -> str:
     why = {k: w for k, (_, w) in d["traits"].items()}
     ty, sp, ro = tok["typography"], tok["spacing"], tok["rounded"]
     if d["kind"] == "taste":
-        source = f"from the taste of {d['looks']} saved design captures (`python -m worker.design_md`)"
+        tone = f" --tone {d['pair']['tone']}" if d.get("pair") and d["pair"]["path"] != PATH else ""
+        source = f"from the taste of {d['looks']} saved design captures (`python -m worker.design_md{tone}`)"
     else:
+        look = f" --look {json.dumps(d['look'], ensure_ascii=False)}" if d.get("look") else ""
         source = (f"from the style topic `{d['key']}`, captures {', '.join(f'#{n}' for n in d['captures'])} "
-                  f"(`python -m worker.design_md --style {d['key'].split('/')[1]}`)")
+                  f"(`python -m worker.design_md --style {d['key'].split('/')[1]}{look}`)")
     lines = ["---", *yaml(tok), "---", "", f"# {d['name']}", "",
              f"Generated by second-brain {source}, in the [DESIGN.md format]({SPEC}). Tokens are derived by "
              "code: measured palettes tuned to WCAG AA contrast, and the type, radius, spacing and depth "
@@ -651,7 +785,14 @@ def render(d: dict, tok: dict, text: dict) -> str:
 
     lines += ["## Overview", "", text["overview"], ""]
     if d["variants"]:
-        lines += [f"This is the topic's dominant look. It also holds: {'; '.join(d['variants'])}.", ""]
+        which = f"the look \"{d['look']}\" of the topic" if d.get("look") else "the topic's dominant look"
+        lines += [f"This is {which}. It also holds: {'; '.join(d['variants'])}. Each one has its own "
+                  "DESIGN.md: add `--look \"<name>\"` to the command above.", ""]
+    if pair := d.get("pair"):
+        lines += [f"The captures split between light and dark backgrounds ({pair['split']}), so the taste comes "
+                  f"as a pair: this file is the {pair['tone']} look and `{pair['twin_path']}` the {pair['twin']} "
+                  "one. Both share type, shapes, spacing and motion; each has color roles measured on its own "
+                  "captures. Use the one that matches the project, or both for a light and a dark mode.", ""]
 
     lines += ["## Colors", ""]
     for role, hex_ in c.items():
@@ -659,6 +800,8 @@ def render(d: dict, tok: dict, text: dict) -> str:
         ratio = f" {contrast(hex_, c[on]):.1f}:1 on {on}." if on else ""
         lines.append(f"- **{cap(role.replace('-', ' '))} ({hex_}):** {cap(ROLE_USE[role])}.{ratio} "
                      f"{cap(d['origin'][role])}.")
+        if role == "primary" and d.get("doubts"):
+            lines[-1] += f" **Low confidence:** {'; '.join(d['doubts'])}."
 
     head, body, label = (ty[k]["fontFamily"] for k in ("headline-lg", "body-md", "label-md"))
     stacks = {name: next(stack for font, stack in FONTS.values() if font == name) for name in (head, body, label)}
@@ -714,10 +857,15 @@ def render(d: dict, tok: dict, text: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def generate(style: str | None = None, model: bool = True) -> tuple[dict, dict, str] | None:
+def design(style: str | None = None, look: str | None = None, tone: str | None = None) -> dict | None:
+    return style_design(style, look) if style else taste_design(tone)
+
+
+def generate(style: str | None = None, model: bool = True, look: str | None = None,
+             tone: str | None = None) -> tuple[dict, dict, str] | None:
     """The design, its tokens and the DESIGN.md text; None when there is nothing to
     derive it from."""
-    d = style_design(style) if style else taste_design()
+    d = design(style, look, tone)
     if not d:
         return None
     tok = tokens(d)
@@ -725,22 +873,35 @@ def generate(style: str | None = None, model: bool = True) -> tuple[dict, dict, 
 
 
 def build(model: bool = True) -> bool:
-    """Rewrites wiki/DESIGN.md from the taste. False when there isn't enough to say."""
+    """Rewrites wiki/DESIGN.md from the taste, and its light or dark twin when the
+    captures split between the two; a twin that no longer applies is removed.
+    False when there isn't enough to say."""
     made = generate(model=model)
     if not made:
         print("[design] not enough captures with a look: no DESIGN.md yet")
         return False
     (wiki.WIKI / PATH).write_text(made[2])
+    twin = made[0]["pair"]["twin"] if made[0]["pair"] else None
+    for tone in ("light", "dark", "mid-tone"):
+        if tone != twin:
+            (wiki.WIKI / tone_path(tone)).unlink(missing_ok=True)
+    if twin:
+        (wiki.WIKI / tone_path(twin)).write_text(generate(model=model, tone=twin)[2])
     return True
 
 
 def dry_run(d: dict, tok: dict):
     print(f"{d['name']}: {d['looks']} look{'' if d['looks'] == 1 else 's'}"
           + (f", colors from capture #{d['anchor']}" if d.get("anchor") else ""))
+    if d.get("pair"):
+        print(f"  pair: {d['pair']['path']} ({d['pair']['tone']}) and {d['pair']['twin_path']} "
+              f"({d['pair']['twin']}), backgrounds {d['pair']['split']}")
     for key, (value, why) in d["traits"].items():
         print(f"  {key}: {value} ({why})")
     for role, hex_ in d["colors"].items():
         print(f"  {role}: {hex_} ({d['origin'][role]})")
+        if role == "primary" and d.get("doubts"):
+            print(f"    low confidence: {'; '.join(d['doubts'])}")
     for name, ratio in contrast_pairs(tok).items():
         print(f"  {name}: {ratio:.2f}:1")
 
@@ -748,31 +909,44 @@ def dry_run(d: dict, tok: dict):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--style", help="a style topic's slug (style-editorial, or editorial); default: the taste")
-    ap.add_argument("--out", help="file to write, or - to print; default: wiki/DESIGN.md for the taste, "
-                                  "printed for a style")
+    ap.add_argument("--look", help="with --style: one of the topic's looks, by its name; default: the dominant one")
+    ap.add_argument("--tone", choices=("light", "dark"),
+                    help="the taste for that background tone, when the captures split between light and dark")
+    ap.add_argument("--out", help="file to write, or - to print; default: wiki/DESIGN.md (and its light or dark "
+                                  "twin) for the taste, printed for a style or a tone")
     ap.add_argument("--dry-run", action="store_true", help="print the derived tokens and change nothing")
     ap.add_argument("--no-model", action="store_true", help="write the prose from a template, without a model")
     args = ap.parse_args()
+    if args.look and not args.style:
+        ap.error("--look needs --style")
+    if args.tone and args.style:
+        ap.error("--tone is for the taste, not a style")
 
-    d = style_design(args.style) if args.style else taste_design()
+    try:
+        d = design(args.style, args.look, args.tone)
+    except NoLook as e:
+        sys.exit(f"[design] {e}")
     if not d:
         known = ", ".join(t["slug"] for t in style_topics()) or "none"
+        background = taste.evidence()["counts"]["background"]
         sys.exit(f"[design] no style topic {args.style!r} with a look (style topics: {known})" if args.style
+                 else f"[design] no {args.tone} taste: the captures don't split between light and dark "
+                      f"(backgrounds: {tally(background) if background else 'none measured'})" if args.tone
                  else f"[design] fewer than {taste.MIN_LOOKS} captures with a look: no DESIGN.md yet")
     tok = tokens(d)
     if args.dry_run:
         return dry_run(d, tok)
-    text = render(d, tok, prose(d, tok, model=not args.no_model))
-    out = args.out or ("-" if args.style else None)
-    if out == "-":
-        sys.stdout.write(text)
-    elif out:
-        Path(out).expanduser().write_text(text)
-        print(f"[design] wrote {out}", file=sys.stderr)
-    else:
-        (wiki.WIKI / PATH).write_text(text)
+    if not (args.style or args.tone or args.out):
+        build(model=not args.no_model)
         wiki.build_index()
         run.commit_wiki("docs(wiki): refresh DESIGN.md")
+        return
+    text = render(d, tok, prose(d, tok, model=not args.no_model))
+    if (args.out or "-") == "-":
+        sys.stdout.write(text)
+    else:
+        Path(args.out).expanduser().write_text(text)
+        print(f"[design] wrote {args.out}", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
     wiki/index.md                            written by code: topics and the patterns they hold
     wiki/taste.md                            recurring choices across captures (worker/taste.py)
     wiki/DESIGN.md                           the same taste as design tokens (worker/design_md.py)
+    wiki/DESIGN.<tone>.md                    its dark or light twin, when the captures split between the two
     wiki/usage.md                            what was built from which captures (worker/used.py)
     wiki/<category>/<topic>.md               one page per topic; the model writes the body
     wiki/sources/<yyyy-mm>/<id>-<slug>.md    one note per capture; written by code
@@ -310,6 +311,10 @@ def build_index():
                   "[Taste](taste.md): the recurring choices across every capture."]
         if (WIKI / "DESIGN.md").exists():
             lines.append("[DESIGN.md](DESIGN.md) holds the same as design tokens, ready to follow.")
+            for tone in ("dark", "light"):
+                if (WIKI / f"DESIGN.{tone}.md").exists():
+                    lines.append(f"The captures split between light and dark: [DESIGN.{tone}.md](DESIGN.{tone}.md) "
+                                 f"is the {tone} twin.")
         lines.append("")
     for cat, about in CATEGORIES.items():
         mine = sorted((t for t in known if t["category"] == cat), key=lambda t: t["title"].lower())
