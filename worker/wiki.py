@@ -348,7 +348,7 @@ def _quote(text: str, limit: int = 1500) -> str:
     return "\n".join(f"> {line}" if line.strip() else ">" for line in text.splitlines())
 
 
-def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False) -> str:
+def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False, speech="") -> str:
     """Everything known about the capture. It is both the classifier's input and
     the body of the note, so it doesn't depend on the model that writes the wiki.
     long_text keeps more of the page (an article is the capture itself)."""
@@ -397,6 +397,9 @@ def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False)
     derived = "\n\n".join(x for x in ((page or {}).get("title"), (page or {}).get("description")) if x)
     if text and text.strip() not in derived:
         out += ["## Post text", "", _quote(text), ""]
+    if speech:
+        out += ["## Narration", "", "What is said in the video, transcribed by a model: names may be misheard.", "",
+                _quote(speech, 4000), ""]
     if page:
         out += ["## Page", ""]
         if page.get("title"):
@@ -479,7 +482,7 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                  intent: str | None = None, frames: list | None = None) -> dict:
     body = source_body(note=note, text=media.get("text"), page=media.get("page"),
                        patterns=patterns, style=style, ideas=ideas or [],
-                       long_text=bool(media.get("article")))
+                       long_text=bool(media.get("article")), speech=media.get("speech") or "")
     is_image = source == "image"  # a bare screenshot or photo, identified by a content hash
     header = ("From: image capture" if is_image else f"URL: {url}\nFrom: {source}") \
         + (f" · @{media['author']}" if media.get("author") else "")

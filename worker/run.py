@@ -127,12 +127,13 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
         media = p.save_image_bytes(image, cid) if source == "image" else p.fetch_media(url, source, cid)
         if media["kind"] == "video":
             frames = p.keyframes(media["path"], cid)
+            media["speech"] = p.speech(media["path"])
         else:
             frames = [media["path"], *media.get("extra", [])] if media["kind"] == "image" else []
         words = p.readable_words(media)
         if not frames and not vlm_note and words < MIN_WORDS:
             raise RuntimeError("Nothing to read: share it again with a note")
-        analysis = p.analyze(frames, vlm_note, media.get("text")) if frames else {}
+        analysis = p.analyze(frames, vlm_note, media.get("text"), media.get("speech")) if frames else {}
         patterns = p.clean_patterns(analysis.get("patterns") or [])
         look = p.clean_style(analysis.get("style"), frames) if frames else None
         # A bare image with no interface pattern (a screenshot of an article, a
@@ -142,7 +143,8 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
             words = p.readable_words(media)
         key_ideas = []
         if media.get("article") or (not patterns and words >= IDEA_WORDS):
-            text = "\n\n".join(x for x in (media.get("text"), (media.get("page") or {}).get("excerpt")) if x)
+            text = "\n\n".join(x for x in (media.get("text"), media.get("speech"),
+                                           (media.get("page") or {}).get("excerpt")) if x)
             key_ideas = p.ideas(text, vlm_note)
         entry = wiki.file_capture(cid=cid, captured=captured, url=url, source=source, media=media,
                                   note=note, patterns=patterns, style=look, style_name=style,

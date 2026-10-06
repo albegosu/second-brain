@@ -45,6 +45,11 @@ API_BASE = (os.environ.get("BRAIN_API_BASE") or PROVIDERS.get(PROVIDER, ("", "")
 API_KEY = os.environ.get("BRAIN_API_KEY", "")
 VLM = os.environ.get("BRAIN_VLM") or ("gemma4:31b-cloud" if PROVIDER == "ollama" else PROVIDERS[PROVIDER][1])
 ROOT = Path(__file__).resolve().parent.parent
+# Speech in videos, transcribed on this machine (speech()). BRAIN_SPEECH=off skips it.
+SPEECH = (os.environ.get("BRAIN_SPEECH") or "auto").strip().lower()
+SPEECH_MODEL = os.environ.get("BRAIN_SPEECH_MODEL") or "base"
+SPEECH_SECONDS = 300  # UI demos are short; a long talk is cut to its first five minutes
+SPEECH_MIN_WORDS = 6  # fewer is a stray word in a soundtrack, not narration
 # Absolute, so paths stay valid whatever the working directory.
 MEDIA = Path(os.environ.get("BRAIN_MEDIA", ROOT / "data" / "media")).expanduser().resolve()
 
@@ -127,6 +132,10 @@ Rules:
   they are isolated moments and the motion between them is invisible. But every
   pattern must be visible in the frames: ignore anything the text mentions that
   doesn't appear.
+- A narration, when given, is what is said in the video, transcribed by a
+  model (names may be misheard). Use it like the post text: to understand what
+  the frames show and why it matters. Patterns must still be visible in the
+  frames.
 - Write title, summary, behavior, notes and every description in English, even
   if the post or the note is in another language.
 - style describes the visual language of the whole capture, not of one pattern.
@@ -887,22 +896,69 @@ def transcribe(frames: list[Path]) -> str:
         return ""
 
 
+_whisper = None  # the speech model, loaded once per process
+
+
+def has_audio(video: Path) -> bool:
+    return bool(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                                "-of", "csv=p=0", str(video)], capture_output=True, text=True).stdout.strip())
+
+
+def speech(video: Path) -> str:
+    """What is said in a video, transcribed on this machine by faster-whisper: no
+    model API and no quota, and the audio never leaves the machine. A voice
+    activity filter drops music and silence, so a demo over a soundtrack gives
+    nothing rather than invented words. Only the first five minutes. Empty when
+    there's no audio or no speech, with BRAIN_SPEECH=off, or without
+    faster-whisper; it never fails the capture."""
+    global _whisper
+    if SPEECH == "off" or not has_audio(video):
+        return ""
+    try:
+        import numpy as np
+        from faster_whisper import WhisperModel
+    except ImportError:
+        print("[pipeline] no speech transcription: faster-whisper isn't installed", file=sys.stderr)
+        return ""
+    try:
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-t", str(SPEECH_SECONDS), "-vn",
+                              "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True, check=True).stdout
+        if not raw:
+            return ""
+        if _whisper is None:
+            _whisper = WhisperModel(SPEECH_MODEL, device="cpu", compute_type="int8")
+        audio = np.frombuffer(raw, np.int16).astype(np.float32) / 32768
+        segments, _ = _whisper.transcribe(audio, vad_filter=True, beam_size=1, condition_on_previous_text=False)
+        # Segments the model itself doubts are left out: they are where it makes things up.
+        text = " ".join(s.text.strip() for s in segments if s.no_speech_prob < 0.6 and s.avg_logprob > -1.0)
+    except Exception as e:
+        print(f"[pipeline] speech dropped: {e}", file=sys.stderr)
+        return ""
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text.split()) < SPEECH_MIN_WORDS:
+        return ""
+    return text + (" …" if video_duration(video) > SPEECH_SECONDS else "")
+
+
 def readable_words(media: dict) -> int:
     """Words there are to read in a capture, links left out. A post whose text is
     the page's title and description (Instagram) doesn't count them twice."""
     page = media.get("page") or {}
     text = str(media.get("text") or "")
-    parts = [text, page.get("excerpt")] + [x for x in (page.get("title"), page.get("description"))
-                                           if x and str(x) not in text]
+    parts = [text, media.get("speech"), page.get("excerpt")] + [x for x in (page.get("title"), page.get("description"))
+                                                                if x and str(x) not in text]
     return len(re.sub(r"https?://\S+", " ", " ".join(str(x or "") for x in parts)).split())
 
 
-def analyze(frames: list[Path], note: str | None, post_text: str | None = None) -> dict:
+def analyze(frames: list[Path], note: str | None, post_text: str | None = None,
+            narration: str | None = None) -> dict:
     prompt = ["Analyze these frames in order."]
     if note:
         prompt.append(f"User's note (what caught their eye): {note}")
     if post_text:
         prompt.append(f"Post text: {post_text}")
+    if narration:
+        prompt.append(f"Narration: {narration[:6000]}")
     data = parse_json(chat(SYSTEM, "\n\n".join(prompt), images=frames, as_json=True))
     return data if isinstance(data, dict) else {"patterns": data}
 
