@@ -445,6 +445,41 @@ To host your own copy, publish `web/` anywhere with HTTPS; the page has no build
 step and loads nothing from other sites. The local inbox isn't supported: a page
 served over HTTPS can't call `http://<mac>.local`.
 
+## Other agents (MCP)
+
+Claude Code reads the wiki through the skill. Clients that don't load skills
+(Claude Desktop, Cursor, Windsurf, Zed…) can read it over MCP:
+`bin/second-brain-mcp` is a read-only server on stdio, with no dependencies
+beyond the engine's. It reads `BRAIN_WIKI` from `.env` and only reads that
+folder: no tool writes, calls a model or reaches the network, so the private
+wiki goes nowhere except to the client you connect.
+
+| Tool | What it returns |
+|---|---|
+| `get_index` | The map: topics, what each holds, uses, latest captures |
+| `search` | Topic pages and source notes that mention some words, best first |
+| `get_topic` | A topic page by title or slug |
+| `get_page` | Any wiki page by its path: a source note, `taste.md`, `DESIGN.md`… |
+| `recent_captures` | The latest captures, newest first, with their links |
+| `get_frames` | What a visual capture looked like, as an image |
+| `get_design_md` | The taste (or its light or dark twin), or a style or one of its looks, as a DESIGN.md |
+
+Point the client at the launcher. For Claude Desktop, in
+`claude_desktop_config.json`; Cursor's `~/.cursor/mcp.json` has the same shape:
+
+```json
+{
+  "mcpServers": {
+    "second-brain": { "command": "/Users/you/Developer/second-brain/bin/second-brain-mcp" }
+  }
+}
+```
+
+The server tells the client how to use the wiki (index first, frames before
+building a look), the way the skill does. It doesn't record uses: that stays
+with the skill. ChatGPT only connects to remote MCP servers, which would mean
+putting the wiki on the internet, so it isn't supported.
+
 ## hypar
 
 [hypar](https://github.com/albegosu/hypar) is a garden for your own ideas: each

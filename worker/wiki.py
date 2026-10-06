@@ -299,6 +299,11 @@ def detach(cid: int):
 
 
 def build_index():
+    WIKI.mkdir(parents=True, exist_ok=True)
+    (WIKI / "index.md").write_text(index_text())
+
+
+def index_text() -> str:
     from .used import topic_uses  # used.py imports this module
     known = topics()
     used = topic_uses()
@@ -340,8 +345,7 @@ def build_index():
                   for day, _, f, m in recent[:15]]
         lines.append("")
 
-    WIKI.mkdir(parents=True, exist_ok=True)
-    (WIKI / "index.md").write_text("\n".join(lines))
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------- capture
