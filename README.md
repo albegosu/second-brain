@@ -427,7 +427,9 @@ server. It works with either [inbox](#two-inboxes).
 
 It's served by GitHub Pages from this repository (`.github/workflows/pages.yml`).
 To host your own copy, publish `web/` anywhere with HTTPS; the page has no build
-step and loads nothing from other sites. The local inbox isn't supported: a page
+step and loads nothing from other sites. Change the link-preview URLs at the top
+of `web/index.html` to your address; the preview image is
+`web/icons/og.png`, rendered from `og.html` next to it. The local inbox isn't supported: a page
 served over HTTPS can't call `http://<mac>.local`.
 
 ## hypar
