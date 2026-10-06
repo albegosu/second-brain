@@ -1,0 +1,6 @@
+#!/bin/sh
+# The wiki over MCP (stdio, read-only) for clients that don't load skills: Claude Desktop, Cursor…
+# Point the client's command at this file. It loads .env for BRAIN_WIKI; stdout carries only the protocol.
+cd "$(dirname "$0")/.." || exit 1
+if [ -f .env ]; then set -a; . ./.env >&2; set +a; fi
+exec .venv/bin/python -m worker.mcp

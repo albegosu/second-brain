@@ -122,8 +122,10 @@ projects are developed apart; only what the bridge needs is synchronized, in the
   the skill looks it up in curated libraries and says so, keeping your own saves
   first.
   *Mobbin MCP and Refero MCP.*
-- **MCP server over the wiki.** Search, recent captures and topic lookup for
-  clients that don't load skills (Cursor, ChatGPT, Claude Desktop).
+- ~~**MCP server over the wiki.**~~ Done: `bin/second-brain-mcp`, a read-only
+  stdio server with index, search, topic and page lookup, recent captures,
+  frames as images and DESIGN.md, for clients that don't load skills (Claude
+  Desktop, Cursor). Still open: ChatGPT, which needs a remote server.
   *Inspired by ContextBolt, Karakeep and the Readwise MCP.*
 - **Semantic search, only if needed.** At personal scale the index plus the
   context window is enough; add embeddings only when the index stops fitting.
