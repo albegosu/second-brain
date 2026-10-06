@@ -43,8 +43,8 @@ class DesignMdTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def made(self, style=None):
-        made = dm.generate(style, model=False)
+    def made(self, style=None, look=None):
+        made = dm.generate(style, model=False, look=look)
         self.assertIsNotNone(made)
         return made
 
@@ -111,18 +111,121 @@ class DesignMdTest(unittest.TestCase):
         self.assertIn("It also holds: Cool Grotesk Variant.", text)
         self.assertIn("Let the text column breathe with wide margins.", text)  # the topic's own Do
 
+    def test_a_look_by_name(self):
+        d, tok, text = self.made("paper-ink", look="cool grotesk")  # part of the name is enough
+        self.assertEqual(d["captures"], [2])
+        self.assertEqual(d["name"], "Paper and Ink: Cool Grotesk Variant")
+        self.assertEqual(d["traits"]["typography"][0], "grotesk")
+        self.assertEqual(tok["colors"]["primary"], "#2f6fe4")  # capture #2's blue, not #3's orange
+        self.assertIn('--style style-paper-ink --look "Cool Grotesk Variant"', text)
+        self.assertIn('This is the look "Cool Grotesk Variant" of the topic. It also holds: Warm Paper Editorial.',
+                      text)
+        warm, dominant = self.made("paper-ink", look="Warm Paper Editorial")[1], self.made("paper-ink")[1]
+        self.assertEqual({**warm, "name": ""}, {**dominant, "name": ""})  # the dominant look, by name
+        with self.assertRaisesRegex(dm.NoLook, "Warm Paper Editorial; Cool Grotesk Variant"):
+            dm.style_design("paper-ink", "neon")
+
     def test_dark_style(self):
         _, tok, text = self.made("night-console")
         self.assertEqual(dm.taste.tone(tok["colors"]["neutral"]), "dark")
         self.assertEqual(tok["typography"]["body-md"]["fontFamily"], "JetBrains Mono")
         self.assertIn("Corners are barely rounded", text)
 
+    # ------------------------------------------------------------ a primary that may be a photo's
+
+    def test_accents_rank_vivid_then_clear_then_muted(self):
+        self.assertEqual([dm.accent_rank(c) for c in ("#d9481f", "#3b6462", "#3a2b22")], [0, 1, 2])
+        self.assertEqual(dm.named_hues("Neon lime and electric blue accents, never `#0b0b0c` teal-free"),
+                         {"green", "blue", "cyan"})
+
+    def test_doubts(self):
+        self.assertEqual(dm.doubts("#d9481f", True, {"orange"}), [])  # a red-orange: orange is next door
+        self.assertEqual(len(dm.doubts("#3b6462", True, set())), 1)  # muted: maybe an image's
+        self.assertIn("tinted dark surface", dm.doubts("#3a2b22", True, set())[0])
+        self.assertEqual(dm.doubts("#d9481f", True, {"blue"}),
+                         ["the wiki describes the look in blue and the primary is red"])
+        self.assertEqual(dm.doubts("#211e1a", False, set()), [])  # the ink of a monochrome look
+        self.assertEqual(dm.doubts("#211e1a", False, {"green", "orange"}),
+                         ["the measured palette has no accent, but the wiki describes the look in green and orange"])
+
+    def test_a_muted_primary_is_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "wiki"
+            shutil.copytree(FIXTURE, copy)
+            note = next((copy / "sources").glob("*/0003-*.md"))
+            text = note.read_text()
+            self.assertIn("`#d9481f` (accent), `#2d5b8a` (accent)", text)
+            note.write_text(text.replace("`#d9481f` (accent), `#2d5b8a` (accent)", "`#3a2b22` (accent), `#3b6462` (accent)"))
+            with mock.patch.object(wiki, "WIKI", copy):
+                d, tok, text = dm.generate("paper-ink", model=False)
+        self.assertEqual(d["anchor"], 3)
+        self.assertEqual(tok["colors"]["primary"], "#3b6462")  # clear before muted and dark, whatever the area
+        self.assertIn("**Low confidence:** no measured accent is vivid", text)
+        self.assertIn("- **Do:** Check primary against the frames of capture #3 before you use it", text)
+        self.assertNotIn("Low confidence", self.made("paper-ink")[2])
+
+    # ------------------------------------------------------------ light and dark
+
+    def split_wiki(self, tmp: str, extra: int = 3) -> Path:
+        """The sample wiki with more dark captures: light 6 · dark 2 + extra."""
+        copy = Path(tmp) / "wiki"
+        shutil.copytree(FIXTURE, copy)
+        dark = next((copy / "sources").glob("*/0004-*.md"))
+        for n in range(10, 10 + extra):
+            (dark.parent / f"{n:04d}-terminal-copy.md").write_text(dark.read_text().replace("capture: 4", f"capture: {n}"))
+        return copy
+
+    def test_no_pair_when_one_tone_leads(self):
+        d, _, text = self.made()
+        self.assertIsNone(d["pair"])
+        self.assertIsNone(dm.taste_design("dark"))
+        self.assertNotIn("DESIGN.dark.md", text)
+
+    def test_a_split_taste_comes_as_a_pair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = self.split_wiki(tmp)
+            with mock.patch.object(wiki, "WIKI", copy):
+                light, light_tok, light_text = dm.generate(model=False)
+                dark, dark_tok, dark_text = dm.generate(model=False, tone="dark")
+                self.assertEqual(dm.generate(model=False, tone="light")[2], light_text)
+        self.assertEqual((light["pair"]["tone"], light["pair"]["twin"]), ("light", "dark"))
+        self.assertEqual(dark["pair"]["path"], "DESIGN.dark.md")
+        self.assertNotIn("background tone", light["unsettled"])
+        self.assertEqual(dm.taste.tone(light_tok["colors"]["neutral"]), "light")
+        self.assertEqual(dm.taste.tone(dark_tok["colors"]["neutral"]), "dark")
+        self.assertEqual(dm.taste.hue(dark_tok["colors"]["primary"]), "green")  # the dark captures' own accent
+        self.assertEqual(dark_tok["typography"], light_tok["typography"])  # the traits are the taste's
+        self.assertEqual(dark_tok["spacing"], light_tok["spacing"])
+        self.assertIn("this file is the light look and `DESIGN.dark.md` the dark one", light_text)
+        self.assertIn("this file is the dark look and `DESIGN.md` the light one", dark_text)
+        self.assertIn("(`python -m worker.design_md --tone dark`)", dark_text)
+        self.assertIn('name: "Taste (dark)"', dark_text)
+        for name, ratio in dm.contrast_pairs(dark_tok).items():
+            self.assertGreaterEqual(ratio, 4.5, name)
+
+    def test_build_writes_the_twin_and_removes_it_when_the_split_ends(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = self.split_wiki(tmp)
+            (copy / "taste.md").write_text("---\ntitle: \"Taste\"\n---\n\n# Taste\n")
+            with mock.patch.object(wiki, "WIKI", copy):
+                self.assertTrue(dm.build(model=False))
+                wiki.build_index()
+                self.assertIn("[DESIGN.dark.md](DESIGN.dark.md)", (copy / "index.md").read_text())
+                self.assertEqual((copy / "DESIGN.dark.md").read_text(), dm.generate(model=False, tone="dark")[2])
+                for extra in (copy / "sources").glob("*/001?-terminal-copy.md"):
+                    extra.unlink()
+                self.assertTrue(dm.build(model=False))
+                wiki.build_index()
+                self.assertFalse((copy / "DESIGN.dark.md").exists())
+                self.assertNotIn("DESIGN.dark.md", (copy / "index.md").read_text())
+
     # ------------------------------------------------------------ the file
 
     def test_every_output_meets_the_spec(self):
-        for style in (None, "paper-ink", "night-console", "soft-lilac"):
-            with self.subTest(style=style):
-                _, tok, text = self.made(style)
+        for style, look in ((None, None), ("paper-ink", None), ("paper-ink", "Cool Grotesk Variant"),
+                            ("night-console", None), ("soft-lilac", None)):
+            with self.subTest(style=style, look=look):
+                _, tok, text = self.made(style, look)
                 self.assertTrue(text.startswith("---\nversion: \"alpha\"\n"))
                 head = frontmatter(text)
                 for key in ("name:", "description:", "colors:", "typography:", "rounded:", "spacing:", "components:"):
@@ -202,9 +305,13 @@ class DesignMdTest(unittest.TestCase):
                          "set DESIGN_MD_LINT=1 to run npx @google/design.md lint")
     def test_the_spec_linter_finds_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for style in (None, "paper-ink", "night-console", "soft-lilac"):
-                path = Path(tmp) / f"{style or 'taste'}.md"
-                path.write_text(self.made(style)[2])
+            outputs = {style or "taste": self.made(style)[2] for style in (None, "paper-ink", "night-console", "soft-lilac")}
+            outputs["paper-ink-look"] = self.made("paper-ink", "Cool Grotesk Variant")[2]
+            with mock.patch.object(wiki, "WIKI", self.split_wiki(tmp)):
+                outputs["taste-dark"] = dm.generate(model=False, tone="dark")[2]
+            for style, text in outputs.items():
+                path = Path(tmp) / f"{style}.md"
+                path.write_text(text)
                 done = subprocess.run(["npx", "-y", "@google/design.md@0.4.0", "lint", str(path)],
                                       capture_output=True, text=True, timeout=300)
                 report = json.loads(done.stdout)

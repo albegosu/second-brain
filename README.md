@@ -89,6 +89,7 @@ wiki/
   index.md                      map of topics; written by code
   taste.md                      recurring choices across captures; weekly
   DESIGN.md                     the same taste as design tokens; weekly
+  DESIGN.dark.md                its dark twin, when the captures split (or .light)
   usage.md                      what was built from which captures
   design/ features/ tools/      one page per topic
   practices/
@@ -177,14 +178,28 @@ own hue until they reach 4.5:1; the type family category becomes an open font
 JetBrains Mono…, named as a default to swap); radius, spacing and depth become
 scales and components. A model writes only the overview and the do's and don'ts,
 and code drops any line with a hex code or a link; without a model a template
-writes them. A style topic with several looks gives the dominant
-one: each trait takes the value most of its captures share, and the colors come
-from the single capture that matches best, so palettes are never mixed. The file
-holds capture numbers but no links or post text.
+writes them. The file holds capture numbers but no links or post text.
+
+- **Light and dark.** When your captures split between light and dark
+  backgrounds with no clear lead, the taste comes as a pair: `wiki/DESIGN.md`
+  for the more frequent tone and `wiki/DESIGN.dark.md` (or `DESIGN.light.md`)
+  for the other. Both share type, shapes, spacing and motion; each has color
+  roles measured on its own tone's captures.
+- **Looks.** A style topic with several looks gives the dominant one, and
+  `--look "<name>"` gives any other: each trait takes the value most of the
+  look's captures share, and the colors come from the single capture that
+  matches best, so palettes are never mixed.
+- **A primary that may be a photo's.** Palettes are measured from pixels, so
+  they include content colors. Accents are ranked vivid first, then clear, then
+  muted or dark. When no accent is vivid, or the words the wiki uses for the look
+  name other colors, the primary is marked **Low confidence** and a rule asks the
+  agent to check it against the capture's frames.
 
 ```bash
-python -m worker.design_md                                      # rewrite wiki/DESIGN.md from the taste
+python -m worker.design_md                                      # rewrite wiki/DESIGN.md (and its twin) from the taste
+python -m worker.design_md --tone dark                          # print the taste's dark twin
 python -m worker.design_md --style editorial --out app/DESIGN.md  # one style topic
+python -m worker.design_md --style editorial --look "Night Edition"  # one of its looks
 python -m worker.design_md --style editorial --dry-run          # print tokens and contrast, change nothing
 python -m worker.design_md --no-model                           # template prose, no model call
 ```
