@@ -230,6 +230,7 @@ the index counts those uses as verifiable.
 | Any other site (news, articles) | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome), the article's own figures and `og:image` |
 | Speech in any video | transcribed on the machine that runs the worker (faster-whisper, first five minutes), so no audio goes to a model API and no quota is spent. A voice filter drops music and silence. The narration goes to the analysis beside the frames, never instead of them, and into the source note; a talk with no interface pattern yields ideas |
 | A shared image (a screenshot or photo, no URL) | the image itself, analyzed like any other capture; if it holds no interface pattern, its text is read so it can still yield ideas. Identified by a content hash, so the same image shared twice isn't filed twice |
+| A live web interface | its computed CSS, read in the same headless Chrome through the DevTools protocol: page, surface, text, button and link colors (the palette, instead of pixels with photos in them), fonts with size, weight, line height and tracking, corner radius of buttons, inputs and cards (the radius trait, instead of the model's guess), padding, gaps, shadows, the transitions declared on links and buttons, and the custom properties on `:root`. Only these values reach the note, never the page's HTML |
 
 ## Setup
 

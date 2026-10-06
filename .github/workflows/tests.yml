@@ -29,6 +29,11 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # The page CSS test drives the runner's google-chrome. Ubuntu 24.04 blocks the
+      # user namespaces its sandbox needs; allow them rather than run it --no-sandbox.
+      - name: Let headless Chrome use its sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
       - name: Tests
         run: python -m unittest discover tests -v
         env:

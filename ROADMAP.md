@@ -29,9 +29,12 @@ is rough priority.
   (`capture_image` on Supabase or the local inbox) or `python -m worker.run
   --image`, and the Shortcut and the capture page send share-sheet images to it.
   *Inspired by mymind and Karakeep.*
-- **Real DOM and CSS for web UI.** For a live web page, capture the actual
-  elements and computed styles instead of a screenshot, so style notes carry
-  exact colors, fonts, radii and spacing rather than estimates.
+- ~~**Real DOM and CSS for web UI.**~~ Done: a live page's computed CSS is read
+  in headless Chrome over the DevTools protocol (no new dependency). The source
+  note gets exact colors, fonts, radius, spacing, shadows, declared transitions
+  and `:root` tokens; the palette and the radius trait come from them. Still
+  open: real font names and transitions in the DESIGN.md, and the homepage of a
+  GitHub repository.
   *Inspired by Stele.*
 - ~~**Audio transcription.**~~ Done: speech in videos is transcribed where the
   worker runs (faster-whisper with a voice filter, so a soundtrack gives

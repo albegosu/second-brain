@@ -135,7 +135,7 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
             raise RuntimeError("Nothing to read: share it again with a note")
         analysis = p.analyze(frames, vlm_note, media.get("text"), media.get("speech")) if frames else {}
         patterns = p.clean_patterns(analysis.get("patterns") or [])
-        look = p.clean_style(analysis.get("style"), frames) if frames else None
+        look = p.clean_style(analysis.get("style"), frames, media.get("css")) if frames else None
         # A bare image with no interface pattern (a screenshot of an article, a
         # slide, a chart): read its text so it can still yield ideas.
         if source == "image" and not patterns and not media.get("text"):
