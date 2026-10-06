@@ -33,9 +33,10 @@ is rough priority.
   elements and computed styles instead of a screenshot, so style notes carry
   exact colors, fonts, radii and spacing rather than estimates.
   *Inspired by Stele.*
-- **Audio transcription.** Many videos explain the idea out loud. Transcribe
-  speech and feed it to the analysis next to the frames, so spoken context isn't
-  lost.
+- ~~**Audio transcription.**~~ Done: speech in videos is transcribed where the
+  worker runs (faster-whisper with a voice filter, so a soundtrack gives
+  nothing), fed to the analysis next to the frames and kept in the source note
+  as the narration. No audio goes to a model API.
   *Inspired by Fabric and ReelRecall.*
 - ~~**Every image of a carousel,** not just the cover.~~ Done: an X post whose
   media are all photos, or an Instagram post yt-dlp reads as a playlist, downloads

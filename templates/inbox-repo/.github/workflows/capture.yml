@@ -63,6 +63,12 @@ jobs:
           sudo apt-get install -y -qq ffmpeg
           pip install -q -r engine/requirements.txt
 
+      # The speech model (faster-whisper, BRAIN_SPEECH_MODEL), so it isn't downloaded on every run.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: speech-${{ vars.BRAIN_SPEECH_MODEL || 'base' }}
+
       # Screenshots use the runner's google-chrome. Ubuntu 24.04 blocks the user
       # namespaces its sandbox needs; allow them rather than run it --no-sandbox.
       - name: Let headless Chrome use its sandbox
@@ -82,6 +88,8 @@ jobs:
           BRAIN_API_KEY: ${{ secrets.BRAIN_API_KEY }}
           BRAIN_API_BASE: ${{ vars.BRAIN_API_BASE }}
           BRAIN_VLM: ${{ vars.BRAIN_VLM || (vars.BRAIN_PROVIDER == '' && 'gemma4:31b' || '') }}
+          BRAIN_SPEECH: ${{ vars.BRAIN_SPEECH }}              # off: don't transcribe speech in videos
+          BRAIN_SPEECH_MODEL: ${{ vars.BRAIN_SPEECH_MODEL }}  # faster-whisper model; base by default
           BRAIN_WIKI: ${{ github.workspace }}/wiki-repo/wiki
           BRAIN_GIT_SYNC: "1"
         run: |

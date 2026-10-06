@@ -228,6 +228,7 @@ the index counts those uses as verifiable.
 | YouTube, Vimeo, TikTok, Bluesky and every other site yt-dlp has an extractor for | the video through yt-dlp, at most 720p and 10 minutes; if it can't be downloaded, the page's thumbnail and description |
 | Direct links to an image or a video | the file itself |
 | Any other site (news, articles) | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome), the article's own figures and `og:image` |
+| Speech in any video | transcribed on the machine that runs the worker (faster-whisper, first five minutes), so no audio goes to a model API and no quota is spent. A voice filter drops music and silence. The narration goes to the analysis beside the frames, never instead of them, and into the source note; a talk with no interface pattern yields ideas |
 | A shared image (a screenshot or photo, no URL) | the image itself, analyzed like any other capture; if it holds no interface pattern, its text is read so it can still yield ideas. Identified by a content hash, so the same image shared twice isn't filed twice |
 
 ## Setup
@@ -516,6 +517,7 @@ Only the title, the summary and the URL go to ntfy.sh.
 | `INBOX_TOKEN` · `INBOX_URL` | — · `http://localhost:8000` | Shortcut token · local inbox |
 | `NTFY_TOPIC` | — | phone notifications |
 | `HYPAR_URL` · `HYPAR_TOKEN` | — | plant **Idea to grow** notes in hypar |
+| `BRAIN_SPEECH` · `BRAIN_SPEECH_MODEL` | on · `base` | `off` to skip transcribing speech in videos · the [faster-whisper](https://github.com/SYSTRAN/faster-whisper) model (`small` is better and slower). On Actions: repository variables |
 | `BRAIN_GIT_SYNC` | — | `1` to commit and push the wiki automatically after each capture |
 | `POLL_INTERVAL` | `60` | seconds between inbox polls |
 
