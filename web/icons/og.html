@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- The capture page's link preview (og.png, 1200×630), in the page's Paper and
+     Ink tokens. Render it with headless Chrome:
+
+     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+       --hide-scrollbars --window-size=1200,630 --screenshot=web/icons/og.png web/icons/og.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --primary: #d9481f;
+    --secondary: #6b655b;
+    --neutral: #f3ede1;
+    --on-surface: #211e1a;
+    --outline: #cdc8bd;
+    --serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+    --sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 72px;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 72px 88px;
+    background: var(--neutral);
+    color: var(--on-surface);
+    font-family: var(--serif);
+  }
+  svg { display: block; width: 300px; height: 300px; }
+  p { margin: 0; }
+  .brand { font: 500 22px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--secondary); }
+  h1 { margin: 20px 0 28px; font: 500 64px/1.05 var(--serif); white-space: nowrap; letter-spacing: -0.015em; }
+  .lead { font: 400 31px/1.4 var(--serif); }
+  .url { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--outline); font: 500 22px/1 var(--sans); color: var(--secondary); }
+</style>
+</head>
+<body>
+  <!-- The icon's artwork (web/icons/build.py), without its paper margin. -->
+  <svg viewBox="136 112 240 264" aria-hidden="true">
+    <rect x="136" y="136" width="240" height="240" fill="#211e1a"/>
+    <rect x="172" y="212" width="120" height="14" fill="#f3ede1"/>
+    <rect x="172" y="248" width="120" height="14" fill="#f3ede1"/>
+    <rect x="172" y="284" width="80" height="14" fill="#f3ede1"/>
+    <polygon points="304,112 348,112 348,300 326,278 304,300" fill="#d9481f"/>
+  </svg>
+  <div>
+    <p class="brand">Capture page</p>
+    <h1>Save to second&#8209;brain</h1>
+    <p class="lead">Share a link, a post or an image from Android or any browser. A vision model files it into your private wiki.</p>
+    <p class="url">albegosu.github.io/second-brain</p>
+  </div>
+</body>
+</html>
