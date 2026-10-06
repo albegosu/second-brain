@@ -112,7 +112,8 @@ Structure:
   look are ONE block citing all of them. Inside each block:
   **Tokens:** the measured palette colors that belong to the interface (hex codes
   from the notes), type family, radius, spacing, depth and motion feel from the
-  notes' traits.
+  notes' traits. When a note has "CSS computed on the live page", use its exact
+  values (font names, sizes, radius, shadows, transitions) instead.
   **Composition:** layout, hierarchy and contrast.
   **Do:** and **Don't:** what the look depends on and what would break it.
   **Use it for:** one line.
@@ -390,7 +391,11 @@ def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False)
         if style.get("palette"):
             colors = ", ".join(f"`{c['hex']}`" + (" (accent)" if c.get("role") == "accent" else "")
                                for c in style["palette"])
-            out += [f"Palette, measured from pixels (includes content colors): {colors}", ""]
+            source = ("from the page's CSS (the interface's own colors)" if style.get("palette_from") == "css"
+                      else "from pixels (includes content colors)")
+            out += [f"Palette, measured {source}: {colors}", ""]
+        if style.get("css"):
+            out += ["CSS computed on the live page, exact values rather than estimates:", *style["css"], ""]
 
     # The post's own words, unless they only repeat the page's title and description
     # (a post that links to a page keeps both).

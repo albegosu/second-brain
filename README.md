@@ -210,6 +210,7 @@ topic was used, so what proves useful stands out from what was only saved.
 | YouTube, Vimeo, TikTok, Bluesky and every other site yt-dlp has an extractor for | the video through yt-dlp, at most 720p and 10 minutes; if it can't be downloaded, the page's thumbnail and description |
 | Direct links to an image or a video | the file itself |
 | Any other site (news, articles) | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome), the article's own figures and `og:image` |
+| A live web interface | its computed CSS, read in the same headless Chrome through the DevTools protocol: page, surface, text, button and link colors (the palette, instead of pixels with photos in them), fonts with size, weight, line height and tracking, corner radius of buttons, inputs and cards (the radius trait, instead of the model's guess), padding, gaps, shadows, the transitions declared on links and buttons, and the custom properties on `:root`. Only these values reach the note, never the page's HTML |
 | A shared image (a screenshot or photo, no URL) | the image itself, analyzed like any other capture; if it holds no interface pattern, its text is read so it can still yield ideas. Identified by a content hash, so the same image shared twice isn't filed twice |
 
 ## Setup

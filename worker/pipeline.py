@@ -25,6 +25,8 @@ import httpx
 import trafilatura
 import yt_dlp
 
+from . import page_css
+
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # Without a local Ollama (GitHub Actions): OLLAMA_HOST=https://ollama.com plus the API key.
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "")
@@ -594,6 +596,8 @@ def fetch_page(url: str, cid: int, visible_text: bool = True) -> dict:
     images = []
     if visible_text and (shot := screenshot(str(r.url), cid)):
         images.append(shot)
+        if css := page_css.read(str(r.url), chrome()):  # the interface's exact colors, type and radius
+            result["css"] = css
     if visible_text:  # the article's own figures, ahead of og:image (often a marketing card)
         images += article_images(html, str(r.url), cid)
     if image := meta("og:image"):
@@ -928,9 +932,11 @@ def clean_patterns(patterns: list) -> list[dict]:
     return out
 
 
-def clean_style(style: dict | None, frames: list[Path]) -> dict:
-    """Traits from the closed vocabulary, plus the palette measured from pixels."""
-    style = style or {}
+def clean_style(style: dict | None, frames: list[Path], css: dict | None = None) -> dict:
+    """Traits from the closed vocabulary, plus the palette measured from pixels.
+    A live page's computed CSS (page_css) is exact where pixels are estimates:
+    its colors are the palette and its radius is the trait."""
+    style, css = style or {}, css or {}
     traits = {}
     for dim, values in STYLE.items():
         v = style.get(dim)
@@ -938,4 +944,7 @@ def clean_style(style: dict | None, frames: list[Path]) -> dict:
             print(f"[pipeline] trait dropped: {dim}={v!r}", file=sys.stderr)
             v = None
         traits[dim] = v
-    return {**traits, "description": style.get("description"), "palette": palette(frames)}
+    if css.get("radius"):
+        traits["radius"] = css["radius"]
+    return {**traits, "description": style.get("description"), "palette": css.get("palette") or palette(frames),
+            "palette_from": "css" if css.get("palette") else "pixels", "css": css.get("lines") or []}
