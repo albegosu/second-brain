@@ -19,7 +19,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed, one `### <name> [n]` block per item:
    - `## Patterns` (design, features): **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
    - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. To build with one, generate its DESIGN.md (see "When building from it").
-   - `## Options` (tools): **What it does**, **Use it when**, **Try it** (the install or run command, verbatim), **Link** (only URLs found in the sources) and **Notes** (for a repository: language, license, last commit, archived).
+   - `## Options` (tools): **What it does**, **Use it when**, **Try it** (the install or run command, verbatim), **Link** (only URLs found in the sources) and **Notes** (for a repository: language, license, last commit, archived, stars).
    - `## Ideas` (practices): **Claim**, **Why it matters**, **How to apply**, **Watch out**.
    - `## Choosing`: which one fits which situation, when there are several.
    - `## See also`: related topics of the same category worth opening when the task spans them. A relevant tool page won't be linked from a design page, so check the index's tools section too.

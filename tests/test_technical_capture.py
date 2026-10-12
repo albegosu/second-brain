@@ -56,6 +56,11 @@ class Snippets(unittest.TestCase):
             {"lang": "shell", "code": "uvx acme serve --port 8000"},
         ])
 
+    def test_more_command_line_tools(self):
+        text = "kubectl apply -f deploy.yaml\nhelm install kit acme/kit\npython -m http.server 8000\nkubectl is great."
+        self.assertEqual(p.snippets(text=text), [
+            {"lang": "shell", "code": "kubectl apply -f deploy.yaml\nhelm install kit acme/kit\npython -m http.server 8000"}])
+
     def test_a_long_block_is_cut_and_says_so(self):
         (snippet,) = p.snippets(markdown="```py\n" + "\n".join(f"x = {i}" for i in range(60)) + "\n```\n")
         lines = snippet["code"].splitlines()
@@ -76,7 +81,7 @@ class Response:
 
 REPO = {"full_name": "someone/kit", "owner": {"login": "someone"}, "description": "A kit", "default_branch": "main",
         "language": "TypeScript", "license": {"spdx_id": "MIT", "name": "MIT License"}, "archived": True,
-        "pushed_at": "2026-09-30T10:00:00Z"}
+        "pushed_at": "2026-09-30T10:00:00Z", "stargazers_count": 1200}
 
 
 class RepositoryFacts(unittest.TestCase):
@@ -96,7 +101,7 @@ class RepositoryFacts(unittest.TestCase):
         repo = result["repo"]
         self.assertEqual({k: v for k, v in repo.items() if k != "checked"},
                          {"name": "someone/kit", "language": "TypeScript", "license": "MIT",
-                          "last_commit": "2026-08-01", "archived": True})
+                          "last_commit": "2026-08-01", "archived": True, "stars": 1200})
         self.assertRegex(repo["checked"], r"^\d{4}-\d{2}-\d{2}$")
         self.assertEqual(result["code"][0], {"lang": "bash", "code": "npm install -g acme-kit"})
 
@@ -112,8 +117,8 @@ class RepositoryFacts(unittest.TestCase):
 
     def test_one_line(self):
         self.assertEqual(wiki.repo_line({"name": "a/b", "language": "Go", "license": None, "last_commit": "2026-01-02",
-                                         "archived": True, "checked": "2026-10-12"}),
-                         "a/b · Go · no license found · last commit 2026-01-02 · archived (checked 2026-10-12)")
+                                         "archived": True, "stars": 0, "checked": "2026-10-12"}),
+                         "a/b · Go · no license found · last commit 2026-01-02 · archived · 0 stars (checked 2026-10-12)")
 
 
 class SourceNote(unittest.TestCase):
@@ -151,6 +156,31 @@ class SourceNote(unittest.TestCase):
         self.assertIn("## Repository\n\nsomeone/kit · TypeScript · MIT license · last commit 2026-08-01", body)
         self.assertLess(body.index("npx acme-kit init"), body.index("npm install -g acme-kit"))
         self.assertNotIn("repo", wiki.read_page(next(self.wiki.rglob("0009-*.md")))[0])  # only where there is one
+
+    def test_commands_in_the_note_and_in_a_posts_page_text(self):
+        media = {"kind": "text", "text": "A kit for agents.",
+                 "page": {"title": "@someone", "excerpt": "Caption.\n$ brew install acme-kit\nThat's it."}}
+        with mock.patch.object(wiki, "classify", return_value={"category": "tools", "topic": "color-pickers",
+                                                               "title": "Kit", "summary": "A kit."}), \
+                mock.patch.object(wiki, "compose", return_value="Page."):
+            entry = wiki.file_capture(cid=41, captured="2026-10-12", url="https://www.instagram.com/p/kit/",
+                                      source="instagram", media=media, note="try npx acme-kit init later\nnpx acme-kit init",
+                                      patterns=[], style=None)
+        body = wiki.read_page(self.wiki / entry["source"])[1]
+        code = body.split("## Code", 1)[1]
+        self.assertLess(code.index("npx acme-kit init"), code.index("brew install acme-kit"))  # the note comes first
+        self.assertNotIn("try npx", code)  # a sentence is not a command
+
+    def test_a_pages_text_is_not_read_twice(self):
+        media = {"kind": "text", "text": "Kit.", "code": [{"lang": "bash", "code": "npm i acme-kit"}],
+                 "page": {"title": "Kit", "excerpt": "Install it:\nnpm i acme-kit --save"}}
+        with mock.patch.object(wiki, "classify", return_value={"category": "tools", "topic": "color-pickers",
+                                                               "title": "Kit", "summary": "A kit."}), \
+                mock.patch.object(wiki, "compose", return_value="Page."):
+            entry = wiki.file_capture(cid=42, captured="2026-10-12", url="https://kit.example", source="web",
+                                      media=media, note=None, patterns=[], style=None)
+        body = wiki.read_page(self.wiki / entry["source"])[1]
+        self.assertNotIn("npm i acme-kit --save", body.split("## Code", 1)[1].split("## Page", 1)[0])
 
     def test_the_topic_page_keeps_code_untouched(self):
         code = "### Rules\n**Notes:** none\n## Sources\nkeep this"

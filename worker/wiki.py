@@ -145,8 +145,10 @@ Rules:
 - Every block and every claim cites its sources with [n].
 - Only what the sources say: no invented details, numbers or framework names.
 - Commands, code and config come only from a note's "Code" section, copied
-  character for character in a fenced code block with its language. Never
-  paraphrase, shorten, merge or invent one, and quote only those a block needs.
+  character for character in a fenced code block with its language, under the
+  block it belongs to (**Try it:** for tools, **How to apply:** for ideas,
+  **How it works:** for patterns). Never paraphrase, shorten, merge or invent
+  one, and quote only those a block needs.
 - Pattern names are short and specific ("Slide-to-confirm", "Staggered card
   reveal"), never the post's title.
 - Palettes, hex codes and style traits stay in the source notes, unless the topic
@@ -470,7 +472,8 @@ def repo_line(repo: dict) -> str:
     facts = [repo.get("name"), repo.get("language"),
              f"{repo['license']} license" if repo.get("license") else "no license found",
              f"last commit {repo['last_commit']}" if repo.get("last_commit") else None,
-             "archived" if repo.get("archived") else None]
+             "archived" if repo.get("archived") else None,
+             f"{repo['stars']} stars" if repo.get("stars") is not None else None]
     return " · ".join(x for x in facts if x) + (f" (checked {repo['checked']})" if repo.get("checked") else "")
 
 
@@ -548,8 +551,12 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                  note: str | None, patterns: list, style: dict | None,
                  style_name: str | None = None, ideas: list | None = None,
                  intent: str | None = None, frames: list | None = None) -> dict:
-    # The post's own commands first (what its author chose to show), then the page's.
-    code = p.unique_snippets([*p.snippets(text=media.get("text") or ""), *(media.get("code") or [])])
+    # Your note's commands first, then the post's (what its author chose to show),
+    # then the page's. A page with no code blocks of its own (a social post's
+    # caption, a page read as text) may still name commands in its text.
+    page_text = "" if media.get("code") else str((media.get("page") or {}).get("excerpt") or "")
+    code = p.unique_snippets([*p.snippets(text=note or ""), *p.snippets(text=media.get("text") or ""),
+                              *(media.get("code") or []), *p.snippets(text=page_text)])
     body = source_body(note=note, text=media.get("text"), page=media.get("page"),
                        patterns=patterns, style=style, ideas=ideas or [],
                        long_text=bool(media.get("article")), speech=media.get("speech") or "",

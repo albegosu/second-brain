@@ -478,6 +478,8 @@ CLI = (r"(?:npx|bunx|pnpx|uvx)\s+[@\w][\w@/.:=-]*"
        r"|uv\s+(?:add|pip|tool|run|init|sync)\b"
        r"|git\s+clone\b|curl\s+(?:-|https?://)|wget\s+https?://"
        r"|docker\s+(?:run|pull|compose)\b|gh\s+(?:repo|extension|api|release)\b"
+       r"|kubectl\s+(?:apply|create|run|port-forward)\b|helm\s+(?:install|upgrade|repo)\b"
+       r"|python3?\s+-m\s+[\w.]+"
        r"|claude\s+(?:mcp|plugin|-p\b|--)|codex\s+(?:exec\b|--)")
 COMMAND = re.compile(rf"[ \t]*(?:[$❯][ \t]+(\S.*)|((?:{CLI}).*))$")
 INLINE = re.compile(rf"`((?:{CLI})[^`\n]*)`")
@@ -585,9 +587,9 @@ def fetch_github(url: str, cid: int) -> dict | None:
 
 def repo_facts(repo: dict, api: str, headers: dict) -> dict:
     """What decides whether a repository is still worth depending on: its
-    language, its license, the date of the last commit on its default branch and
-    whether it is archived. "checked" is the day they were read, so they can be
-    refreshed later. A license GitHub can't identify keeps its name ("Other");
+    language, its license, the date of the last commit on its default branch,
+    whether it is archived, and its stars as a rough sign of use. "checked" is
+    the day they were read, so they can be refreshed later. A license GitHub can't identify keeps its name ("Other");
     none means no license file was found."""
     last = repo.get("pushed_at")  # a push to any branch: the fallback when commits can't be listed
     try:
@@ -603,7 +605,7 @@ def repo_facts(repo: dict, api: str, headers: dict) -> dict:
     return {"name": repo["full_name"], "language": repo.get("language"),
             "license": (spdx if spdx and spdx != "NOASSERTION" else license_.get("name") or "Other") if license_ else None,
             "last_commit": str(last)[:10] if last else None, "archived": bool(repo.get("archived")),
-            "checked": date.today().isoformat()}
+            "stars": repo.get("stargazers_count"), "checked": date.today().isoformat()}
 
 
 FIGURE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")  # a markdown image, as trafilatura emits it
@@ -972,6 +974,8 @@ Rules:
 - If the text isn't about ideas or practices (a product launch, an ad for a
   course or service, a list of tools, a UI demo, a caption), return {"ideas": []}.
 - English, whatever the language of the text. Leave a field empty rather than guess.
+- Commands, code and config the text gives are copied exactly, in backticks,
+  into "apply": never paraphrase or shorten them.
 """
 
 
