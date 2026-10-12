@@ -128,7 +128,7 @@ class DesignMdTest(unittest.TestCase):
     def test_dark_style(self):
         _, tok, text = self.made("night-console")
         self.assertEqual(dm.taste.tone(tok["colors"]["neutral"]), "dark")
-        self.assertEqual(tok["typography"]["body-md"]["fontFamily"], "JetBrains Mono")
+        self.assertEqual(tok["typography"]["body-md"]["fontFamily"], "JetBrains Mono Variable")  # from its CSS
         self.assertIn("Corners are barely rounded", text)
 
     # ------------------------------------------------------------ a primary that may be a photo's
@@ -250,6 +250,61 @@ class DesignMdTest(unittest.TestCase):
             with self.subTest(example=name):
                 self.assertEqual((ROOT / "docs" / "examples" / name).read_text(), self.made(style)[2],
                                  "refresh docs/examples (see this file's docstring)")
+
+    # ------------------------------------------------------------ computed CSS
+
+    def test_css_block_is_parsed(self):
+        look = next(l for l in dm.looks() if l["capture"] == 5)
+        fonts = look["css"]["fonts"]
+        self.assertEqual(fonts["headings"], {"family": "Berkeley Mono", "size": 20.0, "weight": 600, "tracking": -0.2})
+        self.assertEqual(fonts["body"]["family"], "JetBrains Mono Variable")
+        self.assertEqual(look["css"]["transitions"][0], ("color 0.12s cubic-bezier(0.2, 0, 0, 1)", 5))
+        self.assertEqual(next(l for l in dm.looks() if l["capture"] == 4)["css"], {})
+
+    def test_timing(self):
+        self.assertEqual(dm.timing("color 0.12s cubic-bezier(0.2, 0, 0, 1)"), (120, "cubic-bezier(0.2, 0, 0, 1)"))
+        self.assertEqual(dm.timing("background-color 120ms cubic-bezier(0.2, 0, 0, 1), color 0.12s ease"),
+                         (120, "cubic-bezier(0.2, 0, 0, 1)"))
+        self.assertEqual(dm.timing("opacity 0.3s"), (300, "ease"))
+        self.assertIsNone(dm.timing("all 0s ease"))
+
+    def test_a_style_uses_its_anchor_capture_css(self):
+        d, tok, text = self.made("night-console")
+        self.assertEqual(d["css"]["captures"], [5])
+        self.assertEqual(tok["typography"]["headline-lg"]["fontFamily"], "Berkeley Mono")
+        self.assertEqual(tok["typography"]["headline-lg"]["fontWeight"], 600)
+        self.assertEqual(tok["typography"]["headline-lg"]["letterSpacing"], "-0.01em")
+        self.assertEqual(tok["typography"]["body-md"]["fontFamily"], "JetBrains Mono Variable")
+        self.assertIn("read from the computed CSS of capture #5", text)
+        self.assertIn('`"Berkeley Mono", "JetBrains Mono", "SF Mono"', text)
+        self.assertIn("120ms with `cubic-bezier(0.2, 0, 0, 1)`", text)  # 5 + 3 declarations at 120ms beat 2 at 300ms
+        self.assertNotIn("Durations can't be measured", text)
+
+    def test_without_css_the_defaults_stay(self):
+        _, tok, text = self.made("paper-ink")
+        self.assertEqual(tok["typography"]["headline-lg"]["fontFamily"], "Source Serif 4")
+        self.assertIn("Durations can't be measured from stills", text)
+
+    def test_the_taste_needs_several_captures_with_css(self):
+        d, _, _ = self.made()
+        self.assertEqual(d["css"], {})  # one capture with CSS out of many: the defaults stay
+        css = {"fonts": {"headings": {"family": "Inter Variable", "size": 32.0, "weight": 510, "tracking": None}},
+               "shadows": ["rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"]}
+        mine = [{"capture": n, "css": css} for n in (1, 2, 3)] + [{"capture": 4, "css": {}}]
+        self.assertEqual(dm.measured(mine)["fonts"]["headings"]["family"], "Inter Variable")
+        self.assertEqual(dm.measured(mine[:2]), {})
+        split = [{"capture": 1, "css": css}, {"capture": 2, "css": css},
+                 *({"capture": n, "css": {"fonts": {"headings": {**css["fonts"]["headings"], "family": f"Other {n}"}}}}
+                   for n in (3, 4))]
+        self.assertNotIn("headings", dm.measured(split).get("fonts", {}))  # 2 of 4 is no majority
+
+    def test_a_soft_shadow_look_takes_the_measured_shadow(self):
+        d, tok, _ = self.made("night-console")
+        d = {**d, "traits": {**d["traits"], "depth": ("soft-shadow", "test")},
+             "css": {**d["css"], "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"}}
+        text = dm.render(d, dm.tokens(d), dm.template(d))
+        self.assertIn("Read from the CSS of capture #5: `rgba(0, 0, 0, 0.08) 0px 8px 24px 0px`", text)
+        self.assertNotIn("A starting point", text)
 
     # ------------------------------------------------------------ the model
 

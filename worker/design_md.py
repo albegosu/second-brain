@@ -31,6 +31,10 @@ takes the value most of the look's captures share (the newest capture breaks a
 tie), and the colors come from the one capture that matches those traits best
 (the newest on a tie), so palettes of different looks are never mixed.
 
+When a capture of a live web page recorded its computed CSS, the fonts, the
+most common transition and the shadow come from it instead of defaults: a style
+reads its anchor capture's, the taste needs CSS_MIN captures that agree.
+
 Measured palettes include content colors, so the primary is a guess when no
 accent is vivid, or when the words the wiki uses for the look name other hues.
 The DESIGN.md then says so and asks to check the capture's frames.
@@ -306,6 +310,95 @@ def roles(neutrals: list[str], accents: list[str]) -> tuple[dict[str, str], dict
     return {r: colors[r] for r in order if r in colors}, origin
 
 
+# ---------------------------------------------------------------- computed CSS
+
+# A web page capture's note keeps the computed CSS of the live page (page_css.lines):
+# exact fonts, transitions and shadows where the traits are categories read from
+# pixels. When it's there, the DESIGN.md uses it; otherwise it keeps the defaults.
+CSS_TYPE = re.compile(r"^(body|headings|labels) (.+?) ([\d.]+)px/(\S+) (\d{3})(?: (-?[\d.]+)px)?$")
+EASING = re.compile(r"cubic-bezier\([^)]*\)|steps\([^)]*\)|ease-in-out|ease-in|ease-out|ease|linear")
+# The taste's captures mostly predate computed CSS: its fonts change only when
+# this many captures have it and most of them agree.
+CSS_MIN = 3
+
+
+def css_block(body: str) -> dict:
+    """The note's "CSS computed on the live page" block: fonts by role (body,
+    headings, labels), each transition with how many elements declare it, and
+    the visible shadows."""
+    m = re.search(r"^CSS computed on the live page[^\n]*\n((?:- .*(?:\n|$))+)", body, re.M)
+    if not m:
+        return {}
+    out = {}
+    for line in m.group(1).splitlines():
+        if line.startswith("- Type: "):
+            fonts = {}
+            for part in line.removeprefix("- Type: ").split(" · "):
+                if t := CSS_TYPE.match(part.strip()):
+                    role, family, size, _, weight, tracking = t.groups()
+                    fonts[role] = {"family": family, "size": float(size), "weight": int(weight),
+                                   "tracking": float(tracking) if tracking else None}
+            if fonts:
+                out["fonts"] = fonts
+        elif line.startswith("- Transitions declared"):
+            out["transitions"] = [(value, int(n)) for value, n in re.findall(r"`([^`]+)` \((\d+)\)", line)]
+        elif line.startswith("- Depth: "):
+            out["shadows"] = re.findall(r"`([^`]+)`", line)
+    return out
+
+
+def timing(value: str) -> tuple[int, str] | None:
+    """Duration in ms and easing of the first timed transition in a declaration."""
+    for part in re.findall(r"(?:[^,(]+|\([^)]*\))+", value):
+        if d := re.search(r"(?<![\w.])([\d.]+)(ms|s)\b", part):
+            ms = round(float(d.group(1)) * (1 if d.group(2) == "ms" else 1000))
+            if ms:
+                easing = EASING.search(part)
+                return ms, easing.group(0) if easing else "ease"
+    return None
+
+
+def measured(mine: list[dict], anchor: int | None = None) -> dict:
+    """Fonts, motion and shadow from computed CSS. A style takes its anchor
+    capture's when it has some, else the most common values across its captures;
+    the taste needs CSS_MIN captures with CSS and a majority for each font."""
+    have = [look for look in mine if look.get("css")]
+    if anchor is not None and (own := [look for look in have if look["capture"] == anchor]):
+        have = own
+    if not have or (anchor is None and len(have) < CSS_MIN):
+        return {}
+    out = {"captures": [look["capture"] for look in have]}
+    fonts = {}
+    for role in ("headings", "body", "labels"):
+        seen = [look["css"]["fonts"][role] for look in have if role in look["css"].get("fonts", {})]
+        if seen:
+            family, n = Counter(f["family"] for f in seen).most_common(1)[0]
+            if len(have) == 1 or n * 2 > len(seen):
+                fonts[role] = next(f for f in seen if f["family"] == family)
+    if fonts:
+        out["fonts"] = fonts
+    times = Counter()
+    for look in have:
+        for value, n in look["css"].get("transitions", []):
+            if t := timing(value):
+                times[t] += n
+    if times:
+        (ms, easing), n = times.most_common(1)[0]
+        out["motion"] = {"ms": ms, "easing": easing, "declarations": n, "total": sum(times.values())}
+    shadows = Counter(s for look in have for s in look["css"].get("shadows", [])[:1])
+    if shadows:
+        out["shadow"] = shadows.most_common(1)[0][0]
+    return out if len(out) > 1 else {}
+
+
+def stack(name: str, category: str | None) -> str:
+    """A font's fallback stack: its own, or the measured font ahead of its category's."""
+    for font, chain in FONTS.values():
+        if font == name:
+            return chain
+    return f'"{name}", ' + FONTS[category if category in FONTS else None][1]
+
+
 # ---------------------------------------------------------------- evidence
 
 def looks(files: list[Path] | None = None) -> list[dict]:
@@ -324,7 +417,7 @@ def looks(files: list[Path] | None = None) -> list[dict]:
             out.append({"capture": int(meta.get("capture") or wiki.capture_number(f.name)),
                         "category": str(meta.get("topic", "")).split("/")[0], "traits": traits,
                         "neutrals": [c for c, accent in colors if not accent],
-                        "accents": [c for c, accent in colors if accent]})
+                        "accents": [c for c, accent in colors if accent], "css": css_block(body)})
     return sorted(out, key=lambda look: look["capture"])
 
 
@@ -446,7 +539,7 @@ def taste_design(tone: str | None = None) -> dict | None:
             "doubts": doubts(colors["primary"], bool(accents), set()),
             "unsettled": unsettled, "evidence": taste.evidence_lines(ev, verdict=True),
             "counts": {k: tally(c[k]) for k in ("layout", "density", "easing", "property") if c[k]},
-            "block": {}, "variants": []}
+            "block": {}, "variants": [], "css": measured(mine)}
 
 
 def style_topics() -> list[dict]:
@@ -541,7 +634,7 @@ def style_design(name: str, look: str | None = None) -> dict | None:
             "unsettled": [k.replace("_", " ") for k, (_, why) in traits.items() if why.startswith("not ")],
             "evidence": [], "counts": {},
             "block": {k: strip_cites(v) for k, v in block["fields"].items() if k != "tokens"},
-            "variants": [b["name"] for b in blocks if b is not block]}
+            "variants": [b["name"] for b in blocks if b is not block], "css": measured(mine, anchor["capture"])}
 
 
 # ---------------------------------------------------------------- tokens
@@ -554,6 +647,15 @@ def tokens(d: dict) -> dict:
     head, body, label = (FONTS[family][0], FONTS[BODY_FONT.get(family, family)][0],
                          FONTS[LABEL_FONT.get(family, family)][0])
     weight, tracking = HEADLINE.get(family, HEADLINE[None])
+    body_weight = 400
+    fonts = (d.get("css") or {}).get("fonts", {})
+    if h := fonts.get("headings"):
+        head, weight = h["family"], h["weight"]
+        tracking = f"{h['tracking'] / h['size']:.3f}".rstrip("0").rstrip(".") + "em" if h["tracking"] else None
+    if b := fonts.get("body"):
+        body, body_weight = b["family"], b["weight"]
+    if lb := fonts.get("labels") or fonts.get("body"):
+        label = lb["family"]
     line = BODY_LINE[spacing]
 
     def type_(font, size, w, height, spacing_=None):
@@ -565,9 +667,9 @@ def tokens(d: dict) -> dict:
         "headline-display": type_(head, 48, weight, "1.1", tracking),
         "headline-lg": type_(head, 32, weight, "1.2", tracking),
         "headline-md": type_(head, 24, weight, "1.3"),
-        "body-lg": type_(body, 18, 400, line),
-        "body-md": type_(body, 16, 400, line),
-        "body-sm": type_(body, 14, 400, line),
+        "body-lg": type_(body, 18, body_weight, line),
+        "body-md": type_(body, 16, body_weight, line),
+        "body-sm": type_(body, 14, body_weight, line),
         "label-lg": type_(label, 14, 500, "1.2", label_tracking),
         "label-md": type_(label, 12, 500, "1.2", label_tracking),
         "label-sm": type_(label, 11, 500, "1.2", label_tracking),
@@ -804,12 +906,23 @@ def render(d: dict, tok: dict, text: dict) -> str:
             lines[-1] += f" **Low confidence:** {'; '.join(d['doubts'])}."
 
     head, body, label = (ty[k]["fontFamily"] for k in ("headline-lg", "body-md", "label-md"))
-    stacks = {name: next(stack for font, stack in FONTS.values() if font == name) for name in (head, body, label)}
-    lines += ["", "## Typography", "",
-              f"The captures' type is {WORDS.get(t['typography'], 'not recorded')} ({why['typography']}). "
-              f"{head} is a common open font of that family: a default, to swap for the project's own.", "",
+    category = t["typography"] if t["typography"] in FONTS else None
+    stacks = {head: stack(head, category), body: stack(body, BODY_FONT.get(category, category)),
+              label: stack(label, LABEL_FONT.get(category, category))}
+    css = d.get("css") or {}
+    seen = listed([f"#{n}" for n in css.get("captures", [])])
+    where = f"capture {seen}" if len(css.get("captures", [])) == 1 else f"captures {seen}"
+    if css.get("fonts"):
+        about = (f"The captures' type is {WORDS.get(t['typography'], 'not recorded')} ({why['typography']}), and "
+                 f"the fonts are read from the computed CSS of {where}: the page's own faces, not a stand-in. "
+                 "Font files and licenses aren't included: load them in the project, or the fallback stacks "
+                 "take over.")
+    else:
+        about = (f"The captures' type is {WORDS.get(t['typography'], 'not recorded')} ({why['typography']}). "
+                 f"{head} is a common open font of that family: a default, to swap for the project's own.")
+    lines += ["", "## Typography", "", about, "",
               f"- **Headlines:** {head} {ty['headline-lg']['fontWeight']}, 24-48px, line height 1.1-1.3.",
-              f"- **Body:** {body} 400, 14-18px, line height {ty['body-md']['lineHeight']}.",
+              f"- **Body:** {body} {ty['body-md']['fontWeight']}, 14-18px, line height {ty['body-md']['lineHeight']}.",
               f"- **Labels:** {label} 500, 11-14px, for buttons, tabs, chips and metadata.",
               "- **Fallback stacks:** " + " · ".join(f"`{s}`" for s in stacks.values()), ""]
 
@@ -820,8 +933,11 @@ def render(d: dict, tok: dict, text: dict) -> str:
               f"items, {sp['lg']} inside cards, {sp['xl']} between sections, {sp['gutter']} gutters and "
               f"{sp['margin']} page margins, with {sp['xs']} and {sp['sm']} for fine steps.{counts}", ""]
 
+    depth = DEPTH.get(t["depth"], DEPTH["flat"])
+    if t["depth"] == "soft-shadow" and css.get("shadow"):
+        depth = depth.split(" A starting point")[0] + f" Read from the CSS of {where}: `{css['shadow']}`."
     lines += ["## Elevation & Depth", "",
-              f"Depth is {WORDS.get(t['depth'], t['depth'])} ({why['depth']}). {DEPTH.get(t['depth'], DEPTH['flat'])}"]
+              f"Depth is {WORDS.get(t['depth'], t['depth'])} ({why['depth']}). {depth}"]
     if t["depth"] in ("soft-shadow", "layered") and taste.tone(c["neutral"]) == "dark":
         lines[-1] += " On a dark background shadows barely show, so let the lighter surface carry the step."
 
@@ -848,9 +964,14 @@ def render(d: dict, tok: dict, text: dict) -> str:
     feel = t["motion_feel"] if t["motion_feel"] in MOTION else "smooth"
     counts = "".join(f" {name} across the captures: {d['counts'][k]}." for k, name in
                      (("easing", "Easing"), ("property", "Animated properties")) if k in d["counts"])
+    if m := css.get("motion"):
+        timed = (f" Read from the CSS of {where}: {m['ms']}ms with `{m['easing']}`, the most common duration "
+                 f"and easing ({m['declarations']} of {m['total']} timed transitions on links, buttons and inputs).")
+    else:
+        timed = " Durations can't be measured from stills, so none is given."
     lines += ["## Motion", "",
-              f"Motion is {'still' if feel == 'none' else feel} ({why['motion_feel']}): {MOTION[feel]}{counts} "
-              "Durations can't be measured from stills, so none is given.", ""]
+              f"Motion is {'still' if feel == 'none' else feel} ({why['motion_feel']}): {MOTION[feel]}{counts}{timed}",
+              ""]
 
     lines += ["## Do's and Don'ts", "", *(f"- **Do:** {x}" for x in text["dos"]),
               *(f"- **Don't:** {x}" for x in text["donts"])]
@@ -898,6 +1019,9 @@ def dry_run(d: dict, tok: dict):
               f"({d['pair']['twin']}), backgrounds {d['pair']['split']}")
     for key, (value, why) in d["traits"].items():
         print(f"  {key}: {value} ({why})")
+    if css := d.get("css"):
+        print(f"  css from captures {', '.join(f'#{n}' for n in css['captures'])}: "
+              + "; ".join(f"{k} {v}" for k, v in css.items() if k != "captures"))
     for role, hex_ in d["colors"].items():
         print(f"  {role}: {hex_} ({d['origin'][role]})")
         if role == "primary" and d.get("doubts"):
