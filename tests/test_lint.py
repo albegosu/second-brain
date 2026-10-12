@@ -17,7 +17,7 @@ def state_of(**sizes) -> dict:
     """{"tools/a": 3} → a state with that many made-up sources per topic."""
     out, n = {}, 0
     for key, size in sizes.items():
-        key = key.replace("__", "/")
+        key = key.replace("__", "/").replace("_", "-")
         sources = [f"sources/2026-01/{(n := n + 1):04d}-note.md" for _ in range(size)]
         out[key] = {"title": key, "summary": "", "category": key.split("/")[0], "sources": sources, "related": []}
     return out
@@ -25,13 +25,18 @@ def state_of(**sizes) -> dict:
 
 class CatchAlls(unittest.TestCase):
     def test_a_topic_holding_much_of_its_category(self):
-        state = state_of(tools__ai=10, tools__a=2, tools__b=2, design__style_x=11,
+        state = state_of(tools__ai=10, tools__a=2, tools__b=2, design__x=11,
                          **{f"design__t{i}": 10 for i in range(10)})
-        self.assertEqual(lint.catch_alls(state), ["tools/ai"])  # the style holds 10% of design
+        self.assertEqual(lint.catch_alls(state), ["tools/ai"])  # design/x holds 10% of design
 
     def test_a_very_large_topic_whatever_the_share(self):
         state = state_of(design__big=15, **{f"design__t{i}": 10 for i in range(10)})
         self.assertEqual(lint.catch_alls(state), ["design/big"])
+
+    def test_never_a_style_or_a_topic_just_merged(self):
+        state = state_of(design__style_x=15, tools__ai=10, tools__a=2)
+        self.assertEqual(lint.catch_alls(state), ["tools/ai"])
+        self.assertEqual(lint.catch_alls(state, skip={"tools/ai"}), [])
 
     def test_small_topics_are_never_catch_alls(self):
         self.assertEqual(lint.catch_alls(state_of(tools__ai=7)), [])

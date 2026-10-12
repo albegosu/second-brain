@@ -75,8 +75,8 @@ Rules:
 
 # A topic is a catch-all candidate from CATCH_ALL sources when it also holds
 # CATCH_ALL_SHARE of its category, or from CATCH_ALL_ALWAYS sources whatever the
-# share. A style topic grows by collecting one look, and design has many topics,
-# so the share keeps it out until it's really large.
+# share. Never a style topic: it grows by collecting one look, and its size is
+# taste, not disorder (the plan's own merges and splits still apply to it).
 CATCH_ALL = 8
 CATCH_ALL_SHARE = 0.25
 CATCH_ALL_ALWAYS = 15
@@ -226,14 +226,16 @@ def apply_plan(state: dict[str, dict], plan: dict) -> tuple[dict[str, dict], lis
     return state, log
 
 
-def catch_alls(state: dict[str, dict]) -> list[str]:
+def catch_alls(state: dict[str, dict], skip=()) -> list[str]:
     """Topics holding so much of their category that they're probably a
-    catch-all. Decided by counting, not by the model."""
+    catch-all. Decided by counting, not by the model. skip: the topics this
+    pass just merged, which the model has judged one subject."""
     per_category = Counter()
     for t in state.values():
         per_category[t["category"]] += len(t["sources"])
     return sorted(key for key, t in state.items()
-                  if (n := len(t["sources"])) >= CATCH_ALL
+                  if key not in skip and not key.split("/")[1].startswith("style-")
+                  and (n := len(t["sources"])) >= CATCH_ALL
                   and (n >= CATCH_ALL_ALWAYS or n >= CATCH_ALL_SHARE * per_category[t["category"]]))
 
 
@@ -300,10 +302,10 @@ def apply_split(state: dict[str, dict], key: str, answer) -> tuple[dict[str, dic
                    + (f", moving notes to {', '.join(joined)}" if joined else "")]
 
 
-def split_catch_alls(state: dict[str, dict]) -> tuple[dict[str, dict], list[str]]:
+def split_catch_alls(state: dict[str, dict], skip=()) -> tuple[dict[str, dict], list[str]]:
     """One model call per catch-all, each with only that topic's notes."""
     log = []
-    for key in catch_alls(state):
+    for key in catch_alls(state, skip):
         try:
             answer = p.parse_json(p.chat(SPLIT, describe_topic(key, state), as_json=True))
         except Exception as e:  # one topic's bad answer never costs the lint pass
@@ -356,7 +358,8 @@ def main():
             sys.exit(f"[lint] unexpected plan: {str(plan)[:200]}")
     after, log = apply_plan(before, plan)
     if not args.no_plan:
-        after, split = split_catch_alls(after)
+        merged = {key_of(m.get("into") or {}) for m in plan.get("merge") or [] if isinstance(m, dict)}
+        after, split = split_catch_alls(after, skip=merged)
         log += split
     notes = [str(n) for n in plan.get("notes") or []]
 
