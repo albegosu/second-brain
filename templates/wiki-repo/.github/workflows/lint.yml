@@ -66,6 +66,7 @@ jobs:
           BRAIN_VLM: ${{ vars.BRAIN_VLM || (vars.BRAIN_PROVIDER == '' && 'gemma4:31b' || '') }}
           BRAIN_WIKI: ${{ github.workspace }}/wiki
           BRAIN_GIT_SYNC: "1"
+          GITHUB_TOKEN: ${{ github.token }}  # stack.md reads repository facts from the GitHub API
           HYPAR_URL: ${{ secrets.HYPAR_URL }}      # optional: keep hypar's copy of the index current
           HYPAR_TOKEN: ${{ secrets.HYPAR_TOKEN }}
           RECOMPOSE_ALL: ${{ inputs.recompose_all && '--recompose-all' || '' }}

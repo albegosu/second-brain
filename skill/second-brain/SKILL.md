@@ -46,6 +46,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
   cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.agents_md --out <project>/AGENTS.md
   ```
   It is derived from private captures (capture numbers, no links or post text), so ask before committing it to a public repository.
+- Before adding a dependency (a library, a CLI, a service), check `wiki/stack.md` if it exists: the user's saved tools by the job they do. If one does the job, say so and prefer it: first one **used** in a build, then one saved **to try**. Don't pick a **stale** one (archived, gone or no commit in a year) unless nothing else fits, and say why. The project's existing stack and the user's choice always win. Record a tool you adopt in the usage log by its capture numbers.
 - Steps, animated properties and easing come from a vision model looking at frames. They are good starting points. Durations are usually omitted on purpose, because they cannot be measured from stills.
 - Palettes in source notes are measured from pixels but include the demo's content colors. Pick the UI ones. A DESIGN.md marks its primary **Low confidence** when no measured accent is vivid or the wiki's words name other colors: look at the frames and take the accent the interface actually uses.
 - Adapt to the project's own design tokens and stack. The only code the wiki holds is what a source showed (a README's install line, a config from a post), copied verbatim: check a command against the tool's current docs before running it.

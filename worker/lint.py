@@ -13,8 +13,9 @@ duplicate topics, splitting catch-all topics, moving misfiled captures and
 relating topics. The code validates the plan (every source note ends up in
 exactly one topic, nothing is dropped) and applies only what passes. It then
 refreshes the taste profile (worker/taste.py), its DESIGN.md
-(worker/design_md.py) and the practices' AGENTS.md (worker/agents_md.py). Runs
-weekly on GitHub Actions (.github/workflows/lint.yml).
+(worker/design_md.py), the practices' AGENTS.md (worker/agents_md.py) and the
+tools' stack.md (worker/stack.py). Runs weekly on GitHub Actions
+(.github/workflows/lint.yml).
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ from . import design_md
 from . import hypar
 from . import pipeline as p
 from . import run
+from . import stack
 from . import taste
 from . import wiki
 
@@ -391,14 +393,20 @@ def main():
     except Exception as e:  # and so is the AGENTS.md
         print(f"[lint] AGENTS.md not refreshed: {e}", file=sys.stderr)
         agents = False
-    if refreshed or designed or agents:
+    try:
+        stacked = stack.build()
+    except Exception as e:  # and the stack.md
+        print(f"[lint] stack.md not refreshed: {e}", file=sys.stderr)
+        stacked = False
+    if refreshed or designed or agents or stacked:
         wiki.build_index()
-    if log or rewritten or refreshed or designed or agents:
+    if log or rewritten or refreshed or designed or agents or stacked:
         run.commit_wiki("docs(wiki): lint pass",
                         "\n".join([*log, *(f"rewrote {k}" for k in rewritten), *(f"note: {n}" for n in notes),
                                     *(["refreshed taste profile"] if refreshed else []),
                                     *(["refreshed DESIGN.md"] if designed else []),
-                                    *(["refreshed AGENTS.md"] if agents else [])]))
+                                    *(["refreshed AGENTS.md"] if agents else []),
+                                    *(["refreshed stack.md"] if stacked else [])]))
         hypar.sync_index(wiki.WIKI)
 
 

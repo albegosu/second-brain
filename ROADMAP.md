@@ -102,10 +102,11 @@ is rough priority.
   worth trying (the rest, three per topic); a model decides once per topic
   whether it concerns a coding agent, kept in the topic's frontmatter, and words
   the rules, which code checks.
-- **`stack.md`, a tool map.** Saved tools by job: which were used (the usage
-  log), which are only to try and which are stale (archived, no recent commit).
-  The skill checks it before adding a dependency.
-  [#58](https://github.com/albegosu/second-brain/issues/58)
+- ~~**`stack.md`, a tool map.**~~ Done: `worker/stack.py` writes
+  `wiki/stack.md` after each lint pass, by code alone: each tools topic is a
+  job, each tool is used, to try or stale (repository archived, gone or without
+  a commit for a year, read from the GitHub API). The skill checks it before
+  adding a dependency.
 - ~~**Implementation-oriented sections.**~~ Done: pages are rewritten from their
   sources as one block per pattern (use it when, steps, motion, pitfalls), a
   "Choosing" section, and an index that lists every pattern.

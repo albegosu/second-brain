@@ -91,6 +91,7 @@ wiki/
   DESIGN.md                     the same taste as design tokens; weekly
   DESIGN.dark.md                its dark twin, when the captures split (or .light)
   AGENTS.md                     the practices as rules for a coding agent; weekly
+  stack.md                      the saved tools by job: used, to try or stale; weekly
   usage.md                      what was built from which captures
   design/ features/ tools/      one page per topic
   practices/
@@ -253,6 +254,21 @@ python -m worker.agents_md                       # rewrite wiki/AGENTS.md and co
 python -m worker.agents_md --dry-run             # each idea's evidence and tier, change nothing
 python -m worker.agents_md --out app/AGENTS.md   # write it into a project
 python -m worker.agents_md --no-model            # no topic filter, ideas in their pages' words
+```
+
+**stack.md.** Before adding a dependency, an agent checks `wiki/stack.md`: the
+tools you saved, grouped by the job they do (each tools topic), written by code
+with no model. A tool is **used** when a capture behind it shaped a build (the
+usage log), **to try** otherwise, and **stale** when its GitHub repository is
+archived, gone or without a commit for a year. The repository is the one the
+tool's Link points to, or the one its source note captured. Facts are read from
+the GitHub API on every rewrite (the lint workflow passes its `GITHUB_TOKEN`),
+and the facts recorded at capture time stand in when GitHub can't be reached.
+
+```bash
+python -m worker.stack                 # rewrite wiki/stack.md and commit it
+python -m worker.stack --dry-run       # print it, change nothing
+python -m worker.stack --offline       # no GitHub calls
 ```
 
 **Usage log.** When Claude builds something that takes from the wiki, the skill

@@ -5,6 +5,7 @@
     wiki/DESIGN.md                           the same taste as design tokens (worker/design_md.py)
     wiki/DESIGN.<tone>.md                    its dark or light twin, when the captures split between the two
     wiki/AGENTS.md                           the practices as rules a coding agent follows (worker/agents_md.py)
+    wiki/stack.md                            the tools by job: used, to try or stale (worker/stack.py)
     wiki/usage.md                            what was built from which captures (worker/used.py)
     wiki/<category>/<topic>.md               one page per topic; the model writes the body
     wiki/sources/<yyyy-mm>/<id>-<slug>.md    one note per capture; written by code
@@ -278,6 +279,47 @@ def pattern_names(body: str) -> list[str]:
     return names
 
 
+BLOCK = re.compile(r"^### (.+?)\s*\[(\d+(?:\s*,\s*\d+)*)\]\s*$")
+FIELD = re.compile(r"^\*\*([A-Z][^*\n]{0,40}):\*\*[ \t]*(.*)$")
+CITES = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\]")
+
+
+def blocks(body: str, section: str) -> list[dict]:
+    """The "### Name [n]" blocks of one section of a topic page ("Ideas",
+    "Options"...): name, cited source numbers, fields by lowercase label
+    ("how to apply", "link"...) without citations, and code blocks. A heading
+    inside a code block is not a block."""
+    codes = []
+
+    def hold(m):
+        codes.append({"lang": m.group(2).lower(), "code": m.group(3).strip("\n").rstrip()})
+        return f"\x00{len(codes) - 1}\x00"
+
+    out, current_section, current, field = [], None, None, None
+    for line in p.FENCE.sub(hold, body).splitlines():
+        if line.startswith("## "):
+            current_section, current = line[3:].strip(), None
+        elif line.startswith("### "):
+            m = BLOCK.match(line) if current_section == section else None
+            current = {"name": m.group(1).strip(), "cites": [int(n) for n in re.findall(r"\d+", m.group(2))],
+                       "fields": {}, "code": []} if m else None
+            if current:
+                out.append(current)
+            field = None
+        elif current is None:
+            continue
+        elif m := re.fullmatch(r"\s*\x00(\d+)\x00\s*", line):
+            current["code"].append(codes[int(m.group(1))])
+        elif m := FIELD.match(line):
+            field = m.group(1).lower()
+            current["fields"][field] = m.group(2).strip()
+        elif field and line.strip():  # a field written over several lines or as a list
+            current["fields"][field] = f"{current['fields'][field]} {line.strip()}".strip()
+    for b in out:
+        b["fields"] = {k: CITES.sub("", v).strip() for k, v in b["fields"].items()}
+    return out
+
+
 def section_label(body: str) -> str:
     """The block section a topic page uses, for the index."""
     return next((s for s in SECTIONS if re.search(rf"^## {s}\s*$", without_code(body), re.M)), "Patterns")
@@ -356,6 +398,9 @@ def index_text() -> str:
     if (WIKI / "AGENTS.md").exists():
         lines += ["Deciding how to approach engineering or agent work? [AGENTS.md](AGENTS.md) holds the",
                   "practices as rules a coding agent follows, firm or worth trying by their evidence.", ""]
+    if (WIKI / "stack.md").exists():
+        lines += ["Adding a dependency? [stack.md](stack.md) maps the saved tools by job: used in a build,",
+                  "saved to try, or stale.", ""]
     for cat, about in CATEGORIES.items():
         mine = sorted((t for t in known if t["category"] == cat), key=lambda t: t["title"].lower())
         lines += [f"## {cat.capitalize()}", "", f"_{about}_", ""]

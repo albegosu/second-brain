@@ -12,7 +12,7 @@ leaves the machine except what the client itself sends on. Tools:
     get_index         the map: topics, what each holds, uses, latest captures
     search            words across topic pages and source notes, topics first
     get_topic         a topic page by name
-    get_page          any wiki page by its path (index, taste, DESIGN.md, AGENTS.md, a source note)
+    get_page          any wiki page by its path (index, taste, DESIGN.md, AGENTS.md, stack.md, a source note)
     recent_captures   the latest captures, newest first
     get_frames        what a visual capture looked like, as an image
     get_design_md     the taste, its light or dark twin, or a style (one of its looks) as a DESIGN.md
@@ -47,7 +47,8 @@ note with get_page for the specifics, and look at get_frames before building a
 look, a layout or an interaction: the text describes the reference, the image is
 the reference. With no style given by the user or the project, build from
 get_design_md. Before approaching engineering or agent work, read AGENTS.md with
-get_page: the user's practices as rules. Say which pages you used. The wiki holds references and ideas
+get_page: the user's practices as rules. Before adding a dependency, read
+stack.md: the saved tools by job, used, to try or stale. Say which pages you used. The wiki holds references and ideas
 written by a model, not specs."""
 
 TOOLS = [
@@ -77,7 +78,8 @@ TOOLS = [
      "description": "Any Markdown page of the wiki by its path, as the index and the pages link it: a source "
                     "note (sources/2026-09/0007-….md, with the user's note, the measured palette and the link "
                     "to the original), a topic page, taste.md, DESIGN.md, AGENTS.md (the user's practices as "
-                    "rules for a coding agent) or usage.md.",
+                    "rules for a coding agent), stack.md (the saved tools by job: used, to try or stale) or "
+                    "usage.md.",
      "inputSchema": {"type": "object", "required": ["path"], "properties": {
          "path": {"type": "string", "description": "Path inside the wiki, like design/loading-states.md or "
                                                    "../sources/2026-09/0007-x.md"}}}},

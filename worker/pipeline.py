@@ -550,9 +550,7 @@ def fetch_github(url: str, cid: int) -> dict | None:
     if not m or m.group(1).lower() in GITHUB_RESERVED:
         return None
     api = f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}"
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "second-brain/1.0"}
-    if token := os.environ.get("GITHUB_TOKEN"):  # higher rate limit on Actions
-        headers["Authorization"] = f"Bearer {token}"
+    headers = github_headers()
     r = httpx.get(api, headers=headers, timeout=30)
     if r.status_code != 200:
         return None
@@ -583,6 +581,38 @@ def fetch_github(url: str, cid: int) -> dict | None:
             result["css"] = css
         return {**result, "path": shot, "kind": "image"}
     return result
+
+
+def github_headers() -> dict:
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "second-brain/1.0"}
+    if token := os.environ.get("GITHUB_TOKEN"):  # higher rate limit on Actions
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def github_name(url: str | None) -> str | None:
+    """"owner/repo" for the URL of a GitHub repository or anything inside it,
+    None for any other URL."""
+    try:
+        parsed = httpx.URL(str(url or ""))
+    except Exception:
+        return None
+    m = GITHUB_REPO.match(parsed.path) if parsed.host in ("github.com", "www.github.com") else None
+    return f"{m.group(1)}/{m.group(2)}" if m and m.group(1).lower() not in GITHUB_RESERVED else None
+
+
+def github_facts(name: str) -> dict | None:
+    """A repository's facts (repo_facts) read now, by its "owner/repo". None when
+    it no longer exists or is private. Raises httpx.HTTPStatusError on a rate
+    limit or any other failure, so the caller can stop asking."""
+    api = f"https://api.github.com/repos/{name}"
+    headers = github_headers()
+    r = httpx.get(api, headers=headers, timeout=30, follow_redirects=True)  # a renamed repository redirects
+    if r.status_code == 404:
+        return None
+    r.raise_for_status()
+    repo = r.json()
+    return repo_facts(repo, f"https://api.github.com/repos/{repo['full_name']}", headers)
 
 
 def repo_facts(repo: dict, api: str, headers: dict) -> dict:
