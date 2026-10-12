@@ -143,8 +143,9 @@ A note with `style: name` (or `estilo: name`) files the capture under
 
 After changing the analysis, this runs the model again over every capture the
 current version hasn't analyzed (source notes record it as `analyzed`) and
-rewrites the wiki. If it stops on a quota or network error, run it again and it
-resumes:
+rewrites the wiki. A capture now filed under another topic leaves its old page
+rewritten from the sources that remain, or deleted if none do. If it stops on a
+quota or network error, run it again and it resumes:
 
 ```bash
 python -m worker.run --reanalyze
