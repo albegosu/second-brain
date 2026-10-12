@@ -40,6 +40,12 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
   cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.design_md --style <slug> --out <project>/DESIGN.md
   ```
   The slug is the topic's file name (`style-editorial`, or just `editorial`); without `--out` it prints. A topic with several looks (one `### Name [n]` block each) gives its dominant one and names the others; add `--look "<name>"` to build from another. A model writes only the overview and rules; `--no-model` skips it (a template writes them) when Ollama isn't reachable. The file carries capture numbers for the usage log but no links or post text; it is still derived from private captures, so ask before committing it to a public repository, and never overwrite a DESIGN.md the project already has.
+- Deciding how to approach engineering or agent work (structuring a task, testing, reviewing, setting up an agent or its tools)? Read `wiki/AGENTS.md` if it exists: the user's practices as rules. Its **Rules** have evidence behind them (two or more captures, or a use in a build): follow them unless the user or the project says otherwise. **Worth trying** are suggestions from a single capture: use them when they fit. The project's own AGENTS.md, CLAUDE.md or instructions always win. Each line ends with its capture numbers, for the usage log below.
+  To put it in a project, write it next to the project's files rather than over them, and never overwrite an AGENTS.md the project already has:
+  ```bash
+  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.agents_md --out <project>/AGENTS.md
+  ```
+  It is derived from private captures (capture numbers, no links or post text), so ask before committing it to a public repository.
 - Steps, animated properties and easing come from a vision model looking at frames. They are good starting points. Durations are usually omitted on purpose, because they cannot be measured from stills.
 - Palettes in source notes are measured from pixels but include the demo's content colors. Pick the UI ones. A DESIGN.md marks its primary **Low confidence** when no measured accent is vivid or the wiki's words name other colors: look at the frames and take the accent the interface actually uses.
 - Adapt to the project's own design tokens and stack. The only code the wiki holds is what a source showed (a README's install line, a config from a post), copied verbatim: check a command against the tool's current docs before running it.

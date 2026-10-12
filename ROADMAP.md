@@ -96,11 +96,12 @@ is rough priority.
   and splits each one in its own model call, with numbered notes the code can
   check. Captures filed before this get them when re-analyzed
   (`python -m worker.run --url <url> --reanalyze`).
-- **Practices as an `AGENTS.md`.** The `DESIGN.md` equivalent for how to work:
-  the `practices` ideas turned into rules a coding agent follows, in the
-  `AGENTS.md` format Claude Code, Cursor and Codex read. Code decides what goes
-  in from counts and evidence; a model only writes the prose.
-  [#57](https://github.com/albegosu/second-brain/issues/57)
+- ~~**Practices as an `AGENTS.md`.**~~ Done: `worker/agents_md.py` writes
+  `wiki/AGENTS.md` after each lint pass, or into a project with `--out`. Code
+  picks rules (two or more captures, or a capture used in a build) and ideas
+  worth trying (the rest, three per topic); a model decides once per topic
+  whether it concerns a coding agent, kept in the topic's frontmatter, and words
+  the rules, which code checks.
 - **`stack.md`, a tool map.** Saved tools by job: which were used (the usage
   log), which are only to try and which are stale (archived, no recent commit).
   The skill checks it before adding a dependency.

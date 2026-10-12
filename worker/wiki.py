@@ -4,6 +4,7 @@
     wiki/taste.md                            recurring choices across captures (worker/taste.py)
     wiki/DESIGN.md                           the same taste as design tokens (worker/design_md.py)
     wiki/DESIGN.<tone>.md                    its dark or light twin, when the captures split between the two
+    wiki/AGENTS.md                           the practices as rules a coding agent follows (worker/agents_md.py)
     wiki/usage.md                            what was built from which captures (worker/used.py)
     wiki/<category>/<topic>.md               one page per topic; the model writes the body
     wiki/sources/<yyyy-mm>/<id>-<slug>.md    one note per capture; written by code
@@ -352,6 +353,9 @@ def index_text() -> str:
                     lines.append(f"The captures split between light and dark: [DESIGN.{tone}.md](DESIGN.{tone}.md) "
                                  f"is the {tone} twin.")
         lines.append("")
+    if (WIKI / "AGENTS.md").exists():
+        lines += ["Deciding how to approach engineering or agent work? [AGENTS.md](AGENTS.md) holds the",
+                  "practices as rules a coding agent follows, firm or worth trying by their evidence.", ""]
     for cat, about in CATEGORIES.items():
         mine = sorted((t for t in known if t["category"] == cat), key=lambda t: t["title"].lower())
         lines += [f"## {cat.capitalize()}", "", f"_{about}_", ""]

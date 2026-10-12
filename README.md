@@ -90,6 +90,7 @@ wiki/
   taste.md                      recurring choices across captures; weekly
   DESIGN.md                     the same taste as design tokens; weekly
   DESIGN.dark.md                its dark twin, when the captures split (or .light)
+  AGENTS.md                     the practices as rules for a coding agent; weekly
   usage.md                      what was built from which captures
   design/ features/ tools/      one page per topic
   practices/
@@ -227,6 +228,32 @@ it looks like, from the synthetic test wiki: [taste](docs/examples/DESIGN.taste.
 and [a style](docs/examples/DESIGN.style-paper-ink.md). The image at the top of this README is built
 from the same test wiki and styled with that style's DESIGN.md:
 `python docs/readme/build_flow.py`.
+
+**AGENTS.md.** The same for how you work: after the lint pass,
+`wiki/AGENTS.md` turns the ideas of your `practices` topics into rules a coding
+agent follows, in the [AGENTS.md](https://agents.md) format that Claude Code,
+Cursor and Codex read. Code decides what goes in and how firmly:
+
+- **Rules** are ideas two or more captures support, or that come from a capture
+  that already shaped a build (the usage log below).
+- **Worth trying** holds every other idea, up to three per topic. Ideas with
+  something to apply and a note of yours come first, then the newest.
+
+A model answers once per topic whether it is about writing, testing, reviewing
+or shipping code, or about working with agents. The answer is saved in the
+topic's frontmatter (`agents: true` or `false`), so the file stays stable, and
+you can edit that field to override it. The model also words each idea as one
+rule and its reason. Code checks the wording (short single lines, no links or
+capture numbers) and otherwise uses the page's own words. A code block goes
+along only when a cited source note recorded it verbatim. Every rule carries
+its capture numbers, so a use can be logged, and a used idea becomes a rule.
+
+```bash
+python -m worker.agents_md                       # rewrite wiki/AGENTS.md and commit it
+python -m worker.agents_md --dry-run             # each idea's evidence and tier, change nothing
+python -m worker.agents_md --out app/AGENTS.md   # write it into a project
+python -m worker.agents_md --no-model            # no topic filter, ideas in their pages' words
+```
 
 **Usage log.** When Claude builds something that takes from the wiki, the skill
 records it with `python -m worker.used <capture numbers> --project … --what …
