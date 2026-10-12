@@ -6,7 +6,9 @@
     python -m worker.lint --recompose-all  # also rewrite every topic page from its sources
 
 The model proposes merging duplicate topics, splitting catch-all topics, moving
-misfiled captures and relating topics. The code validates the plan (every source
+misfiled captures and relating topics. A topic far larger than the rest of its
+category (a catch-all) also gets its own split request, since in the plan of the
+whole wiki the model rarely splits anything. The code validates the plan (every source
 note ends up in exactly one topic, nothing is dropped) and applies only what
 passes. It then refreshes the taste profile (worker/taste.py) and its DESIGN.md
 (worker/design_md.py). Runs weekly on GitHub Actions (.github/workflows/lint.yml).
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import statistics
 import sys
 from datetime import date
 
@@ -69,6 +72,64 @@ Rules:
 """.replace("__CATEGORIES__", "\n".join(f"- {k}: {v}" for k, v in wiki.CATEGORIES.items()))
 
 
+SPLIT = """You are the librarian of a personal knowledge base. One topic has grown
+into a catch-all: it holds far more captures than the other topics of its
+category, so an AI coding assistant can't tell from its name what is inside.
+Split it into specific topics, each named after the one job or subject its
+captures share ("browser-automation", "local-llm-runners", "agent-skills").
+
+You get the topic, its source notes (path, title, summary and what each covers)
+and the other topics of the category. Return ONLY JSON:
+
+{"into": [{"category": "...", "slug": "...", "title": "...", "summary": "...",
+           "sources": ["sources/..."]}]}
+
+Rules:
+- Every source of the topic appears in exactly one part. Copy the paths exactly.
+- Each part groups at least 2 sources. Captures that fit no group stay together
+  in one part that may reuse the topic's slug.
+- Don't reuse the slug of another existing topic; the category stays the same.
+- Slugs in kebab-case, titles short Title Case, summaries one line.
+- If the captures really are about one subject, return {"into": []}.
+"""
+
+
+CATCH_ALL_MIN = 8
+CATCH_ALL_RATIO = 2.5
+
+
+def catch_alls(state: dict[str, dict]) -> list[str]:
+    """Topics far larger than their category's typical topic: at least
+    CATCH_ALL_MIN sources and CATCH_ALL_RATIO times the category's median. Visual
+    styles are left alone: a look gathers many captures by nature."""
+    by_cat: dict[str, list[int]] = {}
+    for t in state.values():
+        by_cat.setdefault(t["category"], []).append(len(t["sources"]))
+    return sorted((k for k, t in state.items()
+                   if not k.split("/")[1].startswith("style-")
+                   and len(t["sources"]) >= max(CATCH_ALL_MIN, CATCH_ALL_RATIO * statistics.median(by_cat[t["category"]]))),
+                  key=lambda k: -len(state[k]["sources"]))
+
+
+def split_catch_alls(state: dict[str, dict]) -> list[dict]:
+    """One focused split proposal per catch-all topic, in the plan's format, to be
+    validated by apply_plan like any other."""
+    splits = []
+    for key in catch_alls(state):
+        others = "\n".join(f"- {k}: {t['title']}" for k, t in sorted(state.items())
+                            if k != key and t["category"] == state[key]["category"])
+        prompt = f"{describe({key: state[key]})}\n\nOther topics in {state[key]['category']}:\n{others or '(none)'}"
+        try:
+            data = p.parse_json(p.chat(SPLIT, prompt, as_json=True, num_ctx=32768))
+        except Exception as e:  # one topic's failure shouldn't stop the pass
+            print(f"[lint] split of {key} not proposed: {e}", file=sys.stderr)
+            continue
+        parts = data.get("into") if isinstance(data, dict) else None
+        if parts:
+            splits.append({"topic": key, "into": parts})
+    return splits
+
+
 def snapshot() -> dict[str, dict]:
     """key → {title, summary, category, sources} for every topic page."""
     return {t["key"]: {"title": t["title"], "summary": t["summary"], "category": t["category"],
@@ -84,11 +145,20 @@ def describe(state: dict[str, dict]) -> str:
             lines.append(f"related: {', '.join(t['related'])}")
         for rel in t["sources"]:
             meta, body = wiki.read_page(wiki.WIKI / rel)
-            shown = re.findall(r"^### (.+)$", body.split("## What it shows", 1)[-1], re.M) if "## What it shows" in body else []
             lines.append(f"- {rel}: {meta.get('title', '')} — {meta.get('summary', '')}"
-                         + (f" [patterns: {'; '.join(shown)}]" if shown else ""))
+                         + "".join(f" [{label}: {'; '.join(found)}]"
+                                   for label, section in (("patterns", "What it shows"), ("ideas", "Key ideas"))
+                                   if (found := headings(body, section))))
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
+
+
+def headings(body: str, section: str) -> list[str]:
+    """The "### " entries of one "## " section of a source note."""
+    if f"## {section}" not in body:
+        return []
+    part = re.split(r"^## (?!#)", body.split(f"## {section}", 1)[1], maxsplit=1, flags=re.M)[0]
+    return re.findall(r"^### (.+)$", part, re.M)
 
 
 def key_of(spec: dict) -> str | None:
@@ -219,6 +289,9 @@ def main():
         if not isinstance(plan, dict):
             sys.exit(f"[lint] unexpected plan: {str(plan)[:200]}")
     after, log = apply_plan(before, plan)
+    if not args.no_plan and (splits := split_catch_alls(after)):
+        after, more = apply_plan(after, {"split": splits})
+        log += more
     notes = [str(n) for n in plan.get("notes") or []]
 
     for line in log or ["no reorganization needed"]:

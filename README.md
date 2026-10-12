@@ -143,6 +143,11 @@ resumes:
 python -m worker.run --reanalyze
 ```
 
+Commands, code and config in a capture (fenced blocks, and lines like
+`npx …` or `pip install …` in the text, the note or a README) are kept verbatim
+in a "Code" section of its source note, and topic pages copy them as they are
+instead of summarizing them.
+
 Topic pages are regenerated from their sources, so manual edits to them don't
 last; put lasting context in the capture's note.
 
@@ -151,7 +156,10 @@ the whole wiki: merge duplicate topics, split catch-alls, move misfiled captures
 and relate topics. The code only applies proposals that keep every source note in
 exactly one topic and only links topics within the same category (across
 categories the model pairs things that merely share an area), rewrites the
-affected pages and commits the result. Locally:
+affected pages and commits the result. A topic far larger than the rest of its
+category (8+ sources and 2.5 times the category's median, visual styles aside)
+also gets a split request of its own, validated the same way: in the review of
+the whole wiki the model rarely splits anything. Locally:
 
 ```bash
 python -m worker.lint --dry-run        # print the validated plan, change nothing
@@ -224,7 +232,7 @@ the index counts those uses as verifiable.
 |---|---|
 | X | fxtwitter: video, GIF or image; X Articles as text, with their key ideas; the media of a quoted post; the page a post without media links to |
 | Instagram, LinkedIn | video through yt-dlp with your browser cookies (`BRAIN_COOKIES`); if yt-dlp can't get it, the video the page publishes as JSON-LD, and failing that (photos, carousels) the cover image |
-| GitHub repositories | description and README through the API; as media, the first image, GIF or video in the README (badges skipped), else a screenshot of the project's homepage |
+| GitHub repositories | description and README through the API, plus language, license, last commit, archived status and stars; as media, the first image, GIF or video in the README (badges skipped), else a screenshot of the project's homepage |
 | YouTube, Vimeo, TikTok, Bluesky and every other site yt-dlp has an extractor for | the video through yt-dlp, at most 720p and 10 minutes; if it can't be downloaded, the page's thumbnail and description |
 | Direct links to an image or a video | the file itself |
 | Any other site (news, articles) | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome), the article's own figures and `og:image` |

@@ -121,8 +121,10 @@ Structure:
 - tools topics: an "## Options" section with one "### <Tool name> [n]" block per
   tool: **What it does:**, **Use it when:**, **Link:** (only a URL from that
   source's "Links", never one you make up), **Notes:** (limits, platform, pricing,
-  only as stated). Tools a source describes in exactly the same words share one
-  block headed with all their names ("### TypeUI · DesignMD [2]").
+  only as stated), **Repo:** (the note's "Repository" line as is, when it has
+  one), **Try it:** (the note's commands from "Code"). Tools a source describes
+  in exactly the same words share one block headed with all their names
+  ("### TypeUI · DesignMD [2]").
 - practices topics: an "## Ideas" section with one "### <Idea name> [n]" block per
   idea: **Claim:**, **Why it matters:**, **How to apply:**, **Watch out:**.
 - With two or more patterns, styles, options or ideas: a "## Choosing" section, a
@@ -133,6 +135,10 @@ Rules:
   (what the vision model actually saw) or "Key ideas" gets its own block, even if
   it only loosely fits the topic. For tools topics, every tool the notes describe
   gets a block.
+- A note's "Code" section is copied exactly, in fenced blocks with its language,
+  under the block it belongs to (**Try it:** for tools, **How to apply:** for
+  ideas, **How it works:** for patterns). Never paraphrase, shorten or invent
+  commands, flags, code or config; leave out the ones that don't belong.
 - Leave out a field that has nothing to say; never write "None" or "Not stated".
 - Ideas that only appear in a post's text or a page excerpt, not under "What it
   shows" (tip lists, generic advice), don't get blocks: list them briefly under a
@@ -360,6 +366,16 @@ def _quote(text: str, limit: int = 1500) -> str:
     return "\n".join(f"> {line}" if line.strip() else ">" for line in text.splitlines())
 
 
+def repo_line(facts: dict) -> str:
+    """A repository's facts on one line: "Language: Go · License: MIT · ..."."""
+    parts = [f"Language: {facts['language']}" if facts.get("language") else None,
+             f"License: {facts['license']}" if facts.get("license") and facts["license"] != "NOASSERTION" else None,
+             f"Last commit: {facts['last_commit']}" if facts.get("last_commit") else None,
+             "Archived: yes" if facts.get("archived") else "Archived: no",
+             f"Stars: {facts['stars']}" if facts.get("stars") is not None else None]
+    return " · ".join(x for x in parts if x)
+
+
 def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False, speech="") -> str:
     """Everything known about the capture. It is both the classifier's input and
     the body of the note, so it doesn't depend on the model that writes the wiki.
@@ -367,6 +383,18 @@ def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False,
     out = []
     if note:
         out += ["## Note", "", _quote(note), ""]
+
+    # Near the top: a topic page is written from the head of each note.
+    if facts := (page or {}).get("repo"):
+        out += ["## Repository", "", repo_line(facts), ""]
+    # A repository's snippets come from its whole README, which the excerpt only begins.
+    code = p.code_snippets(note, text, None if (page or {}).get("code") else (page or {}).get("excerpt"))
+    seen = {c["code"] for c in code}
+    code += [c for c in (page or {}).get("code") or [] if c["code"] not in seen]
+    if code:
+        out += ["## Code", "", "Exactly as the source gives it:", ""]
+        for c in code[:8]:
+            out += [f"```{c.get('lang') or ''}", c["code"], "```", ""]
 
     shown = [pt for pt in patterns if isinstance(pt, dict) and pt.get("title")]
     if shown:
@@ -540,7 +568,8 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
     write_page(WIKI / rel,
                {"title": title, "summary": summary, "url": url, "source": source,
                 "author": media.get("author"), "captured": captured,
-                "topic": key, "tags": tags, "capture": cid, "note": note, "analyzed": ANALYZED},
+                "topic": key, "tags": tags, "capture": cid, "note": note, "analyzed": ANALYZED,
+                **({"repo": repo} if (repo := (media.get("page") or {}).get("repo")) else {})},
                f"# {title}\n\n{summary}\n\n"
                f"Filed under [{meta['title']}](../../{key}.md)"
                f"{'' if is_image else f' · [original]({url})'}\n\n{shown}{body}")

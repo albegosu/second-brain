@@ -53,8 +53,13 @@ is rough priority.
 
 - ~~**Lint pass.**~~ Done: `worker/lint.py`, weekly on GitHub Actions. Merges
   duplicate topics, splits catch-alls, moves misfiled captures, adds "See also"
-  links and reports contradictions in the commit message.
+  links and reports contradictions in the commit message. Catch-all topics (far
+  larger than the rest of their category) get a focused split request.
   *Inspired by Karpathy's LLM wiki pattern.*
+- ~~**Technical captures.**~~ Done: commands, code and config kept verbatim in
+  source notes and topic pages; GitHub repositories record language, license,
+  last commit and archived status. The base for practices as an AGENTS.md and a
+  stack.md tool map (next).
 - ~~**Style topics as `DESIGN.md`.**~~ Done: design topics made of looks (or
   named `style-*`) are written as a `## Styles` sheet with tokens (measured
   palette, type, radius, spacing, depth, motion), composition and do/don't.

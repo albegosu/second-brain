@@ -466,6 +466,67 @@ README_MEDIA = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)|<img[^>]+src=[\"']([^\"
 BADGE = re.compile(r"shields\.io|badgen|badge|/workflows/|codecov|\.svg(?:\?|$)", re.I)
 
 
+FENCE = re.compile(r"^[ \t]*(```|~~~)[ \t]*([\w+#.-]*)[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.M | re.S)
+# A line that runs a command: the tools people paste install and usage lines for.
+COMMAND = re.compile(r"^(?:\$ )?(?:npx|npm|pnpm|yarn|bunx?|pip3?|pipx|uvx?|brew|cargo|go (?:install|get|run)|"
+                     r"docker(?: compose)?|kubectl|helm|curl|wget|git clone|deno|gh|claude|python3? -m)\s+\S")
+INLINE = re.compile(r"`([^`\n]{4,200})`")
+
+
+def code_snippets(*texts: str | None, limit: int = 6, size: int = 1200) -> list[dict]:
+    """The commands, code and config a text gives, exactly as written: fenced
+    blocks first, then command lines found in prose or inline code. A summary
+    loses the one thing a technical capture is for, so these are kept verbatim.
+    Returns [{"lang", "code"}], deduplicated, at most `limit` blocks of `size`
+    characters (a longer block is cut at a line break)."""
+    found, seen, loose = [], set(), []
+
+    def add(lang: str, code: str):
+        code = code.strip("\n").rstrip()
+        if len(code) > size:
+            code = code[:size].rsplit("\n", 1)[0] + "\n…"
+        key = re.sub(r"\s+", " ", code).strip()
+        if len(key) >= 4 and key not in seen and len(found) < limit:
+            seen.add(key)
+            found.append({"lang": lang, "code": code})
+
+    for text in texts:
+        if not text:
+            continue
+        for m in FENCE.finditer(text):
+            add(m.group(2).lower(), m.group(3))
+        prose = FENCE.sub("", text)
+        for line in prose.splitlines():
+            line = line.strip().lstrip(">").strip()
+            for cand in [*INLINE.findall(line), line]:
+                cand = cand.strip()
+                if COMMAND.match(cand) and len(cand) <= 200:
+                    loose.append(cand.removeprefix("$ "))
+                    break
+    if loose:
+        add("bash", "\n".join(dict.fromkeys(loose)))
+    return found
+
+
+def repo_facts(api: str, repo: dict, headers: dict) -> dict:
+    """What says whether a repository is alive and usable: language, license, the
+    date of the last commit on its default branch (the last push when the commits
+    can't be read) and whether it is archived. Stars as a rough sign of use."""
+    last = repo.get("pushed_at")
+    try:
+        r = httpx.get(f"{api}/commits", params={"per_page": 1, "sha": repo.get("default_branch") or ""},
+                      headers=headers, timeout=30)
+        if r.status_code == 200 and r.json():
+            last = r.json()[0]["commit"]["committer"]["date"]
+    except Exception as e:
+        print(f"[pipeline] last commit unknown: {e}", file=sys.stderr)
+    return {"language": repo.get("language"),
+            "license": (repo.get("license") or {}).get("spdx_id") or None,
+            "last_commit": (last or "")[:10] or None,
+            "archived": bool(repo.get("archived")),
+            "stars": repo.get("stargazers_count")}
+
+
 def fetch_github(url: str, cid: int) -> dict | None:
     """A repository: description and README from the API. As media, the first
     image or video in the README (demos are often a GIF), else a screenshot of the
@@ -489,7 +550,9 @@ def fetch_github(url: str, cid: int) -> dict | None:
     result = {"path": None, "kind": "text", "author": repo["owner"]["login"],
               "text": repo.get("description"),
               "page": {"title": repo["full_name"], "description": repo.get("description"),
-                       "excerpt": readme[:3000]}}
+                       "excerpt": readme[:3000], "repo": repo_facts(api, repo, headers),
+                       # Install and usage commands sit past the excerpt in most READMEs.
+                       "code": code_snippets(readme)}}
     raw = f"https://raw.githubusercontent.com/{repo['full_name']}/{repo.get('default_branch') or 'HEAD'}/"
     for match in README_MEDIA.finditer(readme):
         src = next(g for g in match.groups() if g)
@@ -871,6 +934,8 @@ Rules:
 - If the text isn't about ideas or practices (a product launch, an ad for a
   course or service, a list of tools, a UI demo, a caption), return {"ideas": []}.
 - English, whatever the language of the text. Leave a field empty rather than guess.
+- Commands, code and config the text gives are copied exactly, in backticks,
+  into "apply": never paraphrase or shorten them.
 """
 
 
