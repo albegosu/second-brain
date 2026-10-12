@@ -159,10 +159,11 @@ categories the model pairs things that merely share an area), rewrites the
 affected pages and commits the result.
 
 Catch-alls are found by counting, not by the model, which never proposed
-splitting them while reviewing the whole wiki: a topic with 8 or more sources
-that holds a quarter of its category, or any topic with 15 or more. Never a
-`style-*` topic (its size is a look you keep saving) or one the same pass just
-merged. For each one
+splitting them while reviewing the whole wiki and would sooner merge one into an
+even larger topic: a topic with 8 or more sources that holds a quarter of its
+category, or any topic with 15 or more, but never a `style-*` topic (its size is
+a look you keep saving). They are split first, so the plan reviews the finer
+topics. For each one
 the model gets only that topic's notes, numbered, and groups them into specific
 topics or into existing topics of the same category. The code keeps a note
 listed twice in its first group, gives back the notes of a new group with a

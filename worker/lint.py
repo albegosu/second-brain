@@ -5,14 +5,15 @@
     python -m worker.lint --dry-run        # only print the validated plan
     python -m worker.lint --recompose-all  # also rewrite every topic page from its sources
 
-The model proposes merging duplicate topics, splitting catch-all topics, moving
-misfiled captures and relating topics. The code validates the plan (every source
-note ends up in exactly one topic, nothing is dropped) and applies only what
-passes. Then the code itself picks the topics grown too large for their category
-and asks the model to group each one's notes into specific topics (SPLIT): in the
-whole-wiki plan the model never proposed splitting them. It then refreshes the
-taste profile (worker/taste.py) and its DESIGN.md (worker/design_md.py). Runs
-weekly on GitHub Actions (.github/workflows/lint.yml).
+First the code picks the topics grown too large for their category and asks the
+model to group each one's notes into specific topics (SPLIT): reviewing the whole
+wiki, the model never proposed splitting them, and it would sooner merge one into
+an even larger topic. Then, on those finer topics, the model proposes merging
+duplicate topics, splitting catch-all topics, moving misfiled captures and
+relating topics. The code validates the plan (every source note ends up in
+exactly one topic, nothing is dropped) and applies only what passes. It then
+refreshes the taste profile (worker/taste.py) and its DESIGN.md
+(worker/design_md.py). Runs weekly on GitHub Actions (.github/workflows/lint.yml).
 """
 from __future__ import annotations
 
@@ -226,15 +227,14 @@ def apply_plan(state: dict[str, dict], plan: dict) -> tuple[dict[str, dict], lis
     return state, log
 
 
-def catch_alls(state: dict[str, dict], skip=()) -> list[str]:
+def catch_alls(state: dict[str, dict]) -> list[str]:
     """Topics holding so much of their category that they're probably a
-    catch-all. Decided by counting, not by the model. skip: the topics this
-    pass just merged, which the model has judged one subject."""
+    catch-all. Decided by counting, not by the model."""
     per_category = Counter()
     for t in state.values():
         per_category[t["category"]] += len(t["sources"])
     return sorted(key for key, t in state.items()
-                  if key not in skip and not key.split("/")[1].startswith("style-")
+                  if not key.split("/")[1].startswith("style-")
                   and (n := len(t["sources"])) >= CATCH_ALL
                   and (n >= CATCH_ALL_ALWAYS or n >= CATCH_ALL_SHARE * per_category[t["category"]]))
 
@@ -302,10 +302,10 @@ def apply_split(state: dict[str, dict], key: str, answer) -> tuple[dict[str, dic
                    + (f", moving notes to {', '.join(joined)}" if joined else "")]
 
 
-def split_catch_alls(state: dict[str, dict], skip=()) -> tuple[dict[str, dict], list[str]]:
+def split_catch_alls(state: dict[str, dict]) -> tuple[dict[str, dict], list[str]]:
     """One model call per catch-all, each with only that topic's notes."""
     log = []
-    for key in catch_alls(state, skip):
+    for key in catch_alls(state):
         try:
             answer = p.parse_json(p.chat(SPLIT, describe_topic(key, state), as_json=True))
         except Exception as e:  # one topic's bad answer never costs the lint pass
@@ -351,16 +351,14 @@ def main():
     args = ap.parse_args()
 
     before = snapshot()
-    plan = {}
+    state, log, plan = before, [], {}
     if not args.no_plan:
-        plan = p.parse_json(p.chat(PLAN, describe(before), as_json=True, num_ctx=32768))
+        state, log = split_catch_alls(before)
+        plan = p.parse_json(p.chat(PLAN, describe(state), as_json=True, num_ctx=32768))
         if not isinstance(plan, dict):
             sys.exit(f"[lint] unexpected plan: {str(plan)[:200]}")
-    after, log = apply_plan(before, plan)
-    if not args.no_plan:
-        merged = {key_of(m.get("into") or {}) for m in plan.get("merge") or [] if isinstance(m, dict)}
-        after, split = split_catch_alls(after, skip=merged)
-        log += split
+    after, changes = apply_plan(state, plan)
+    log += changes
     notes = [str(n) for n in plan.get("notes") or []]
 
     for line in log or ["no reorganization needed"]:

@@ -33,10 +33,8 @@ class CatchAlls(unittest.TestCase):
         state = state_of(design__big=15, **{f"design__t{i}": 10 for i in range(10)})
         self.assertEqual(lint.catch_alls(state), ["design/big"])
 
-    def test_never_a_style_or_a_topic_just_merged(self):
-        state = state_of(design__style_x=15, tools__ai=10, tools__a=2)
-        self.assertEqual(lint.catch_alls(state), ["tools/ai"])
-        self.assertEqual(lint.catch_alls(state, skip={"tools/ai"}), [])
+    def test_never_a_style(self):
+        self.assertEqual(lint.catch_alls(state_of(design__style_x=15, tools__ai=10, tools__a=2)), ["tools/ai"])
 
     def test_small_topics_are_never_catch_alls(self):
         self.assertEqual(lint.catch_alls(state_of(tools__ai=7)), [])
@@ -142,6 +140,23 @@ class SplitOnDisk(unittest.TestCase):
         self.assertIn("Filed under [AI Code Review](../../tools/ai-code-review.md)", body)
         index = (self.wiki / "index.md").read_text()
         self.assertIn("[Coding Agents](tools/coding-agents.md) — Agents that write code. (4 sources)", index)
+
+    def test_the_plan_reviews_the_finer_topics(self):
+        answer = {"parts": [{"slug": "coding-agents", "sources": [1, 2, 7, 8]},
+                            {"slug": "ai-code-review", "sources": [3, 4, 5, 6]}]}
+        plan = {"merge": [{"topics": ["tools/coding-agents", "tools/color-pickers"],
+                           "into": {"category": "tools", "slug": "coding-agents"}}]}
+        replies = {lint.SPLIT: answer, lint.PLAN: plan}
+        with mock.patch.object(lint.p, "chat", side_effect=lambda system, user, **_: json.dumps(replies[system])) as chat, \
+                mock.patch("sys.argv", ["lint", "--dry-run"]), mock.patch("builtins.print") as out:
+            lint.main()
+        self.assertEqual([c.args[0] for c in chat.call_args_list], [lint.SPLIT, lint.PLAN])  # split first
+        self.assertIn("## tools/ai-code-review", chat.call_args_list[1].args[1])
+        self.assertNotIn("## tools/ai-tools", chat.call_args_list[1].args[1])
+        printed = [c.args[0] for c in out.call_args_list]
+        self.assertEqual(printed[:2], ["[lint] split tools/ai-tools into tools/coding-agents, tools/ai-code-review",
+                                       "[lint] merged tools/coding-agents, tools/color-pickers into tools/coding-agents"])
+        self.assertTrue((self.wiki / "tools/ai-tools.md").exists())  # a dry run writes nothing
 
     def test_a_failed_answer_keeps_the_topic(self):
         with mock.patch.object(lint.p, "chat", return_value="not json"):
