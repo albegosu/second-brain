@@ -63,10 +63,13 @@ class ApplySplit(unittest.TestCase):
     def test_every_note_stays_in_exactly_one_topic(self):
         after, _ = self.split({"slug": "coding-agents", "sources": [1, 2, 2, 3]},
                               {"slug": "code-review", "sources": [3, 4, 99]},  # 3 is taken, 99 doesn't exist
-                              {"slug": "single", "sources": [5]})  # a new topic needs two notes
+                              {"slug": "text-to-speech", "sources": [5]},  # a note with no pair gets its own topic
+                              {"slug": "empty", "sources": [3]})  # nothing left for it
         self.assertEqual(after["tools/coding-agents"]["sources"], self.notes[:3])
-        self.assertNotIn("tools/code-review", after)  # one note left: it gave it back
-        self.assertEqual(after["tools/ai"]["sources"], self.notes[3:])  # what no part took stays
+        self.assertEqual(after["tools/code-review"]["sources"], [self.notes[3]])
+        self.assertEqual(after["tools/text-to-speech"]["sources"], [self.notes[4]])
+        self.assertNotIn("tools/empty", after)
+        self.assertEqual(after["tools/ai"]["sources"], [self.notes[5]])  # what no part took stays
         self.assertEqual(sorted(s for t in after.values() for s in t["sources"]),
                          sorted(s for t in self.state.values() for s in t["sources"]))
 

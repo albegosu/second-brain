@@ -59,8 +59,10 @@ Rules:
   often shows several patterns, so fragmenting into one-note topics makes things
   harder to find, not easier. Together the parts must list every source of the
   topic exactly once. A part may reuse the slug of the topic being split.
-- move: a single note filed under the wrong topic. The target can be an existing
-  topic or one created by your merge or split.
+- move: a single note filed under the wrong topic, into a topic that covers it.
+  The target can be an existing topic or one created by your merge or split. If
+  no topic covers the note, leave it where it is and say so in notes: a topic
+  that doesn't fit is worse than the one it has.
 - related: pair topics a builder would want to read together while building ONE
   thing: alternatives for the same goal, patterns often combined in the same
   screen, a style and the patterns that use it. Never pair topics just because both
@@ -98,8 +100,10 @@ Rules:
 - Group the notes by the job they do or the subject they cover
   ("screen-recorders", "terminal-coding-agents", "agent-code-review"), never by
   vendor, date, format or popularity.
-- Each new part holds at least 2 notes. A part may instead join one of the other
-  topics listed, using its slug; then one note is enough.
+- A part may join one of the other topics listed by using its slug.
+- A note that shares its subject with no other note gets a part of its own,
+  named for that subject, unless it belongs in one of the other topics. Never
+  force a note into a group it doesn't belong to.
 - Every note number goes in exactly one part.
 - As few parts as make each one specific, usually 2 to 6. Keep the topic's own
   slug only for a part its name still describes precisely.
@@ -252,10 +256,11 @@ def describe_topic(key: str, state: dict[str, dict]) -> str:
 
 def apply_split(state: dict[str, dict], key: str, answer) -> tuple[dict[str, dict], list[str]]:
     """Applies the model's grouping of a catch-all's notes, within its category.
-    The code keeps it safe: a note listed twice stays in its first part, a new
-    part with a single note or a vague name ("misc-…") gives its notes back,
-    every note no part takes stays in the topic, and nothing changes unless the
-    notes end up in two topics or more."""
+    The code keeps it safe: a note listed twice stays in its first part, a part
+    with a vague name ("misc-…") gives its notes back, every note no part takes
+    stays in the topic, and nothing changes unless the notes end up in two topics
+    or more. A part may hold a single note: forced into a group, a note that
+    shares its subject with no other lands in a topic that doesn't fit it."""
     old, category = state[key], state[key]["category"]
     numbered = list(old["sources"])
     taken, groups = set(), {}  # target key → {"spec", "sources"}
@@ -268,8 +273,7 @@ def apply_split(state: dict[str, dict], key: str, answer) -> tuple[dict[str, dic
         mine = list(dict.fromkeys(numbered[n - 1] for n in numbers
                                   if 1 <= n <= len(numbered) and numbered[n - 1] not in taken))
         target = f"{category}/{slug}"
-        joins = target in state and target != key
-        if slug == "untitled" or len(mine) < (1 if joins else 2) or (VAGUE.search(slug) and not joins):
+        if slug == "untitled" or not mine or (VAGUE.search(slug) and not (target in state and target != key)):
             continue
         taken.update(mine)
         groups.setdefault(target, {"spec": part, "sources": []})["sources"] += mine
