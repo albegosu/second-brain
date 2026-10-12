@@ -32,9 +32,9 @@ is rough priority.
 - ~~**Real DOM and CSS for web UI.**~~ Done: a live page's computed CSS is read
   in headless Chrome over the DevTools protocol (no new dependency). The source
   note gets exact colors, fonts, radius, spacing, shadows, declared transitions
-  and `:root` tokens; the palette and the radius trait come from them. Still
-  open: real font names and transitions in the DESIGN.md, and the homepage of a
-  GitHub repository.
+  and `:root` tokens; the palette and the radius trait come from them, and the
+  DESIGN.md takes its fonts, the most common transition and the shadow. A
+  GitHub repository without media gets its homepage's CSS.
   *Inspired by Stele.*
 - ~~**Audio transcription.**~~ Done: speech in videos is transcribed where the
   worker runs (faster-whisper with a voice filter, so a soundtrack gives
