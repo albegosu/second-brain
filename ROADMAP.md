@@ -100,11 +100,11 @@ is rough priority.
   the `practices` ideas turned into rules a coding agent follows, in the
   `AGENTS.md` format Claude Code, Cursor and Codex read. Code decides what goes
   in from counts and evidence; a model only writes the prose.
-  [#55](https://github.com/albegosu/second-brain/issues/55)
+  [#57](https://github.com/albegosu/second-brain/issues/57)
 - **`stack.md`, a tool map.** Saved tools by job: which were used (the usage
   log), which are only to try and which are stale (archived, no recent commit).
   The skill checks it before adding a dependency.
-  [#56](https://github.com/albegosu/second-brain/issues/56)
+  [#58](https://github.com/albegosu/second-brain/issues/58)
 - ~~**Implementation-oriented sections.**~~ Done: pages are rewritten from their
   sources as one block per pattern (use it when, steps, motion, pitfalls), a
   "Choosing" section, and an index that lists every pattern.
