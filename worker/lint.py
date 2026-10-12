@@ -5,20 +5,22 @@
     python -m worker.lint --dry-run        # only print the validated plan
     python -m worker.lint --recompose-all  # also rewrite every topic page from its sources
 
-The model proposes merging duplicate topics, splitting catch-all topics, moving
-misfiled captures and relating topics. A topic far larger than the rest of its
-category (a catch-all) also gets its own split request, since in the plan of the
-whole wiki the model rarely splits anything. The code validates the plan (every source
-note ends up in exactly one topic, nothing is dropped) and applies only what
-passes. It then refreshes the taste profile (worker/taste.py) and its DESIGN.md
+First the code picks the topics grown too large for their category and asks the
+model to group each one's notes into specific topics (SPLIT): reviewing the whole
+wiki, the model never proposed splitting them, and it would sooner merge one into
+an even larger topic. Then, on those finer topics, the model proposes merging
+duplicate topics, splitting catch-all topics, moving misfiled captures and
+relating topics. The code validates the plan (every source note ends up in
+exactly one topic, nothing is dropped) and applies only what passes. It then
+refreshes the taste profile (worker/taste.py) and its DESIGN.md
 (worker/design_md.py). Runs weekly on GitHub Actions (.github/workflows/lint.yml).
 """
 from __future__ import annotations
 
 import argparse
 import re
-import statistics
 import sys
+from collections import Counter
 from datetime import date
 
 from . import design_md
@@ -29,8 +31,9 @@ from . import taste
 from . import wiki
 
 PLAN = """You are the librarian of a personal knowledge base of UI patterns,
-product features and tools. An AI coding assistant finds things through its index,
-so topics must be specific, not overlapping, and named after what they contain.
+product features, tools and practices. An AI coding assistant finds things
+through its index, so topics must be specific, not overlapping, and named after
+what they contain.
 Categories:
 __CATEGORIES__
 
@@ -71,63 +74,39 @@ Rules:
   visual look keep a slug starting with "style-".
 """.replace("__CATEGORIES__", "\n".join(f"- {k}: {v}" for k, v in wiki.CATEGORIES.items()))
 
+# A topic is a catch-all candidate from CATCH_ALL sources when it also holds
+# CATCH_ALL_SHARE of its category, or from CATCH_ALL_ALWAYS sources whatever the
+# share. Never a style topic: it grows by collecting one look, and its size is
+# taste, not disorder (the plan's own merges and splits still apply to it).
+CATCH_ALL = 8
+CATCH_ALL_SHARE = 0.25
+CATCH_ALL_ALWAYS = 15
+# A part named like this is a new catch-all: its notes stay where they were.
+VAGUE = re.compile(r"(?:^|-)(?:misc|miscellaneous|other|others|general|generic|various|assorted|stuff)(?:-|$)")
 
-SPLIT = """You are the librarian of a personal knowledge base. One topic has grown
-into a catch-all: it holds far more captures than the other topics of its
-category, so an AI coding assistant can't tell from its name what is inside.
-Split it into specific topics, each named after the one job or subject its
-captures share ("browser-automation", "local-llm-runners", "agent-skills").
+SPLIT = """You reorganize one topic of a personal knowledge base that has grown into a
+catch-all. An AI coding assistant finds things through the index, so a topic must
+be one subject a builder would look for, named after what it holds.
 
-You get the topic, its source notes (path, title, summary and what each covers)
-and the other topics of the category. Return ONLY JSON:
+You get the topic, the other topics of its category and the topic's numbered
+source notes: title, summary, tags and what each one shows. Return ONLY JSON:
 
-{"into": [{"category": "...", "slug": "...", "title": "...", "summary": "...",
-           "sources": ["sources/..."]}]}
+{"parts": [{"slug": "kebab-case", "title": "Short Title Case", "summary": "one line",
+            "sources": [1, 4, 7]}]}
 
 Rules:
-- Every source of the topic appears in exactly one part. Copy the paths exactly.
-- Each part groups at least 2 sources. Captures that fit no group stay together
-  in one part that may reuse the topic's slug.
-- Don't reuse the slug of another existing topic; the category stays the same.
-- Slugs in kebab-case, titles short Title Case, summaries one line.
-- If the captures really are about one subject, return {"into": []}.
+- Group the notes by the job they do or the subject they cover
+  ("screen-recorders", "terminal-coding-agents", "agent-code-review"), never by
+  vendor, date, format or popularity.
+- Each new part holds at least 2 notes. A part may instead join one of the other
+  topics listed, using its slug; then one note is enough.
+- Every note number goes in exactly one part.
+- As few parts as make each one specific, usually 2 to 6. Keep the topic's own
+  slug only for a part its name still describes precisely.
+- Never a new catch-all: no "misc", "other", "general", "resources", "ai-tools".
+- If the notes really are one subject, return {"parts": []}.
+- Write in English.
 """
-
-
-CATCH_ALL_MIN = 8
-CATCH_ALL_RATIO = 2.5
-
-
-def catch_alls(state: dict[str, dict]) -> list[str]:
-    """Topics far larger than their category's typical topic: at least
-    CATCH_ALL_MIN sources and CATCH_ALL_RATIO times the category's median. Visual
-    styles are left alone: a look gathers many captures by nature."""
-    by_cat: dict[str, list[int]] = {}
-    for t in state.values():
-        by_cat.setdefault(t["category"], []).append(len(t["sources"]))
-    return sorted((k for k, t in state.items()
-                   if not k.split("/")[1].startswith("style-")
-                   and len(t["sources"]) >= max(CATCH_ALL_MIN, CATCH_ALL_RATIO * statistics.median(by_cat[t["category"]]))),
-                  key=lambda k: -len(state[k]["sources"]))
-
-
-def split_catch_alls(state: dict[str, dict]) -> list[dict]:
-    """One focused split proposal per catch-all topic, in the plan's format, to be
-    validated by apply_plan like any other."""
-    splits = []
-    for key in catch_alls(state):
-        others = "\n".join(f"- {k}: {t['title']}" for k, t in sorted(state.items())
-                            if k != key and t["category"] == state[key]["category"])
-        prompt = f"{describe({key: state[key]})}\n\nOther topics in {state[key]['category']}:\n{others or '(none)'}"
-        try:
-            data = p.parse_json(p.chat(SPLIT, prompt, as_json=True, num_ctx=32768))
-        except Exception as e:  # one topic's failure shouldn't stop the pass
-            print(f"[lint] split of {key} not proposed: {e}", file=sys.stderr)
-            continue
-        parts = data.get("into") if isinstance(data, dict) else None
-        if parts:
-            splits.append({"topic": key, "into": parts})
-    return splits
 
 
 def snapshot() -> dict[str, dict]:
@@ -137,28 +116,26 @@ def snapshot() -> dict[str, dict]:
             for t in wiki.topics()}
 
 
+def note_line(rel: str, tags: bool = False) -> str:
+    """A source note in one line: title, summary and the patterns or ideas it shows."""
+    meta, body = wiki.read_page(wiki.WIKI / rel)
+    body = wiki.without_code(body)
+    shown = [head for section in ("What it shows", "Key ideas") if f"## {section}\n" in body
+             for head in re.findall(r"^### (.+)$", body.split(f"## {section}\n", 1)[1].split("\n## ", 1)[0], re.M)]
+    return (f"{meta.get('title', '')} — {meta.get('summary', '')}"
+            + (f" [tags: {', '.join(meta.get('tags') or [])}]" if tags and meta.get("tags") else "")
+            + (f" [patterns: {'; '.join(shown)}]" if shown else ""))
+
+
 def describe(state: dict[str, dict]) -> str:
     blocks = []
     for key, t in sorted(state.items()):
         lines = [f"## {key}: {t['title']} — {t['summary']}"]
         if t["related"]:
             lines.append(f"related: {', '.join(t['related'])}")
-        for rel in t["sources"]:
-            meta, body = wiki.read_page(wiki.WIKI / rel)
-            lines.append(f"- {rel}: {meta.get('title', '')} — {meta.get('summary', '')}"
-                         + "".join(f" [{label}: {'; '.join(found)}]"
-                                   for label, section in (("patterns", "What it shows"), ("ideas", "Key ideas"))
-                                   if (found := headings(body, section))))
+        lines += [f"- {rel}: {note_line(rel)}" for rel in t["sources"]]
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
-
-
-def headings(body: str, section: str) -> list[str]:
-    """The "### " entries of one "## " section of a source note."""
-    if f"## {section}" not in body:
-        return []
-    part = re.split(r"^## (?!#)", body.split(f"## {section}", 1)[1], maxsplit=1, flags=re.M)[0]
-    return re.findall(r"^### (.+)$", part, re.M)
 
 
 def key_of(spec: dict) -> str | None:
@@ -250,6 +227,97 @@ def apply_plan(state: dict[str, dict], plan: dict) -> tuple[dict[str, dict], lis
     return state, log
 
 
+def catch_alls(state: dict[str, dict]) -> list[str]:
+    """Topics holding so much of their category that they're probably a
+    catch-all. Decided by counting, not by the model."""
+    per_category = Counter()
+    for t in state.values():
+        per_category[t["category"]] += len(t["sources"])
+    return sorted(key for key, t in state.items()
+                  if not key.split("/")[1].startswith("style-")
+                  and (n := len(t["sources"])) >= CATCH_ALL
+                  and (n >= CATCH_ALL_ALWAYS or n >= CATCH_ALL_SHARE * per_category[t["category"]]))
+
+
+def describe_topic(key: str, state: dict[str, dict]) -> str:
+    """The split prompt's input: the topic, its category's other topics and its
+    notes numbered, so the model answers with numbers instead of paths."""
+    t = state[key]
+    others = [f"- {k}: {o['title']} — {o['summary']}" for k, o in sorted(state.items())
+              if o["category"] == t["category"] and k != key]
+    return "\n".join([f"Topic: {key}: {t['title']} — {t['summary']}", "",
+                      "Other topics in this category, which a part may join:", *(others or ["(none)"]), "",
+                      "Source notes:", *(f"[{i}] {note_line(rel, tags=True)}" for i, rel in enumerate(t["sources"], 1))])
+
+
+def apply_split(state: dict[str, dict], key: str, answer) -> tuple[dict[str, dict], list[str]]:
+    """Applies the model's grouping of a catch-all's notes, within its category.
+    The code keeps it safe: a note listed twice stays in its first part, a new
+    part with a single note or a vague name ("misc-…") gives its notes back,
+    every note no part takes stays in the topic, and nothing changes unless the
+    notes end up in two topics or more."""
+    old, category = state[key], state[key]["category"]
+    numbered = list(old["sources"])
+    taken, groups = set(), {}  # target key → {"spec", "sources"}
+    for part in (answer.get("parts") if isinstance(answer, dict) else None) or []:
+        if not isinstance(part, dict):
+            continue
+        # "tools/screen-recorders": the model sometimes repeats the category.
+        slug = wiki.slugify(str(part.get("slug") or part.get("title") or "").rsplit("/", 1)[-1])
+        numbers = [int(d) for n in part.get("sources") or [] if (d := re.sub(r"\D", "", str(n)))]
+        mine = list(dict.fromkeys(numbered[n - 1] for n in numbers
+                                  if 1 <= n <= len(numbered) and numbered[n - 1] not in taken))
+        target = f"{category}/{slug}"
+        joins = target in state and target != key
+        if slug == "untitled" or len(mine) < (1 if joins else 2) or (VAGUE.search(slug) and not joins):
+            continue
+        taken.update(mine)
+        groups.setdefault(target, {"spec": part, "sources": []})["sources"] += mine
+    kept = groups.pop(key, None)
+    rest = [s for s in numbered if s not in taken] + (kept["sources"] if kept else [])
+    if len(groups) + bool(rest) < 2:
+        return state, []
+
+    joined = [k for k in groups if k in state]
+    state = {k: {**t, "sources": list(t["sources"]), "related": list(t.get("related") or [])}
+             for k, t in state.items()}
+    if rest:
+        spec = kept["spec"] if kept else {}
+        state[key].update(title=spec.get("title") or old["title"], summary=spec.get("summary") or old["summary"],
+                          sources=rest)
+    else:
+        state.pop(key)
+    for target, g in groups.items():
+        if target in state:
+            state[target]["sources"] += g["sources"]
+        else:
+            state[target] = {"title": str(g["spec"].get("title") or target.split("/")[1].replace("-", " ").title()),
+                             "summary": str(g["spec"].get("summary") or ""), "category": category,
+                             "sources": g["sources"], "related": []}
+    for t in state.values():
+        t["sources"] = sorted(dict.fromkeys(t["sources"]), key=wiki.capture_number)
+        t["related"] = [k for k in t["related"] if k in state]
+    parts = ([key] if rest else []) + [k for k in groups if k not in joined]
+    return state, [f"split {key} into {', '.join(parts) or '-'}"
+                   + (f", moving notes to {', '.join(joined)}" if joined else "")]
+
+
+def split_catch_alls(state: dict[str, dict]) -> tuple[dict[str, dict], list[str]]:
+    """One model call per catch-all, each with only that topic's notes."""
+    log = []
+    for key in catch_alls(state):
+        try:
+            answer = p.parse_json(p.chat(SPLIT, describe_topic(key, state), as_json=True))
+        except Exception as e:  # one topic's bad answer never costs the lint pass
+            print(f"[lint] skipped: split {key}: {e}", file=sys.stderr)
+            continue
+        state, done = apply_split(state, key, answer)
+        if not done:
+            print(f"[lint] kept whole: {key} ({len(state[key]['sources'])} sources)", file=sys.stderr)
+        log += done
+    return state, log
+
+
 def write_state(before: dict[str, dict], after: dict[str, dict], recompose_all: bool) -> list[str]:
     """Writes pages, retargets moved notes and deletes topics that no longer exist.
     Returns the keys whose page was rewritten."""
@@ -283,15 +351,14 @@ def main():
     args = ap.parse_args()
 
     before = snapshot()
-    plan = {}
+    state, log, plan = before, [], {}
     if not args.no_plan:
-        plan = p.parse_json(p.chat(PLAN, describe(before), as_json=True, num_ctx=32768))
+        state, log = split_catch_alls(before)
+        plan = p.parse_json(p.chat(PLAN, describe(state), as_json=True, num_ctx=32768))
         if not isinstance(plan, dict):
             sys.exit(f"[lint] unexpected plan: {str(plan)[:200]}")
-    after, log = apply_plan(before, plan)
-    if not args.no_plan and (splits := split_catch_alls(after)):
-        after, more = apply_plan(after, {"split": splits})
-        log += more
+    after, changes = apply_plan(state, plan)
+    log += changes
     notes = [str(n) for n in plan.get("notes") or []]
 
     for line in log or ["no reorganization needed"]:

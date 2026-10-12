@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import date
 from html import unescape
 from pathlib import Path
 from urllib.parse import urljoin
@@ -220,7 +221,8 @@ def fetch_x(url: str, cid: int) -> dict | None:
         return {"path": None, "kind": "text", "article": True, "author": author,
                 "text": "\n\n".join(x for x in (article.get("title"), article.get("preview_text")) if x),
                 "page": {"title": article.get("title"), "description": article.get("preview_text"),
-                         "excerpt": body or article.get("preview_text") or ""}}
+                         "excerpt": body or article.get("preview_text") or ""},
+                "code": snippets(text=body)}
 
     media = (tweet.get("media") or {}).get("all") or []
     quote = tweet.get("quote") or {}
@@ -458,73 +460,83 @@ def readable(html: str, url: str) -> str:
     return re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", text))).strip()
 
 
+# Commands, code and config are kept exactly as the source wrote them: a summary
+# loses the flag, the path or the package name that makes a command work.
+SNIPPETS = 6  # per capture, in the order the source shows them
+SNIPPET_LINES = 40  # a longer block is cut, and says so
+SNIPPET_CHARS = 2000
+SKIP_LANGS = {"mermaid", "math", "svg"}  # diagrams and formulas, not something to run
+FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})[ \t]*([\w+#.-]*)[^\n]*\n(.*?)^[ \t]{0,3}\1[`~]*[ \t]*$", re.M | re.S)
+PRE = re.compile(r"<pre\b([^>]*)>(.*?)</pre>", re.I | re.S)
+LANG = re.compile(r"\b(?:language|lang|highlight-source|highlight)-([\w+#-]+)", re.I)
+# A shell command in plain text (a post, an article): a known CLI followed by one
+# of its subcommands, so prose that only names a tool ("I use git daily") stays
+# prose. Or anything after a "$ " prompt.
+CLI = (r"(?:npx|bunx|pnpx|uvx)\s+[@\w][\w@/.:=-]*"
+       r"|(?:npm|pnpm|yarn|bun)\s+(?:i|install|add|create|run|exec|dlx|x|init)\b"
+       r"|(?:pip3?|pipx|gem|cargo|go|brew|apt|apt-get|deno)\s+(?:install|add|get|run|tap)\b"
+       r"|uv\s+(?:add|pip|tool|run|init|sync)\b"
+       r"|git\s+clone\b|curl\s+(?:-|https?://)|wget\s+https?://"
+       r"|docker\s+(?:run|pull|compose)\b|gh\s+(?:repo|extension|api|release)\b"
+       r"|claude\s+(?:mcp|plugin|-p\b|--)|codex\s+(?:exec\b|--)")
+COMMAND = re.compile(rf"[ \t]*(?:[$❯][ \t]+(\S.*)|((?:{CLI}).*))$")
+INLINE = re.compile(rf"`((?:{CLI})[^`\n]*)`")
+
+
+def snippets(markdown: str = "", html: str = "", text: str = "") -> list[dict]:
+    """Commands, code and config exactly as the source wrote them, so a topic
+    page can quote the real install line instead of a paraphrase: the fenced
+    blocks of a README or a post, the <pre> blocks of a page, and shell commands
+    in plain text. [{"lang", "code"}], up to SNIPPETS in the order they appear."""
+    found = []
+    for source in (markdown, text):
+        found += [{"lang": m.group(2), "code": m.group(3)} for m in FENCE.finditer(source)]
+    for attrs, inner in PRE.findall(html):
+        lang = LANG.search(attrs) or LANG.search(inner[:300])
+        code = unescape(re.sub(r"<[^>]+>", "", re.sub(r"<br\s*/?>", "\n", inner, flags=re.I)))
+        found.append({"lang": lang.group(1) if lang else "", "code": code})
+    block = []
+    for line in FENCE.sub("", text).splitlines() + [""]:
+        if m := COMMAND.match(line):
+            command = (m.group(1) or m.group(2)).strip()
+            # Without a prompt, a sentence that starts with a command is still prose.
+            if m.group(1) or (len(command) <= 160 and not re.search(r"[A-Za-z][.!?]$", command)):
+                block.append(command)
+                continue
+        if block:
+            found.append({"lang": "shell", "code": "\n".join(block)})
+            block = []
+    found += [{"lang": "shell", "code": c.strip()} for c in INLINE.findall(FENCE.sub("", text))]
+    return unique_snippets(found)
+
+
+def unique_snippets(found: list[dict]) -> list[dict]:
+    """Snippets without repeats, diagrams or near-empty blocks, each cut at
+    SNIPPET_LINES lines and SNIPPET_CHARS characters, up to SNIPPETS."""
+    out, seen = [], set()
+    for item in found:
+        lang, code = str(item.get("lang") or "").lower(), str(item.get("code") or "").strip("\n").rstrip()
+        key = " ".join(code.split())
+        if len(key) < 4 or key in seen or lang in SKIP_LANGS:
+            continue
+        seen.add(key)
+        lines, kept = code.splitlines(), []
+        for line in lines[:SNIPPET_LINES]:
+            if sum(len(x) + 1 for x in kept) + len(line) > SNIPPET_CHARS:
+                break
+            kept.append(line)
+        out.append({"lang": lang, "code": "\n".join(kept + (["…"] if len(kept) < len(lines) else []))})
+        if len(out) == SNIPPETS:
+            break
+    return out
+
+
 GITHUB_REPO = re.compile(r"^/([\w.-]+)/([\w.-]+?)(?:\.git)?(?:/|$)")
 GITHUB_RESERVED = {"orgs", "topics", "collections", "features", "marketplace", "sponsors", "settings",
                    "search", "trending", "explore", "enterprise", "pricing", "login", "about"}
 README_MEDIA = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)|<img[^>]+src=[\"']([^\"']+)"
                           r"|^\s*(https://github\.com/user-attachments/assets/[\w-]+)\s*$", re.I | re.M)
 BADGE = re.compile(r"shields\.io|badgen|badge|/workflows/|codecov|\.svg(?:\?|$)", re.I)
-
-
-FENCE = re.compile(r"^[ \t]*(```|~~~)[ \t]*([\w+#.-]*)[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.M | re.S)
-# A line that runs a command: the tools people paste install and usage lines for.
-COMMAND = re.compile(r"^(?:\$ )?(?:npx|npm|pnpm|yarn|bunx?|pip3?|pipx|uvx?|brew|cargo|go (?:install|get|run)|"
-                     r"docker(?: compose)?|kubectl|helm|curl|wget|git clone|deno|gh|claude|python3? -m)\s+\S")
-INLINE = re.compile(r"`([^`\n]{4,200})`")
-
-
-def code_snippets(*texts: str | None, limit: int = 6, size: int = 1200) -> list[dict]:
-    """The commands, code and config a text gives, exactly as written: fenced
-    blocks first, then command lines found in prose or inline code. A summary
-    loses the one thing a technical capture is for, so these are kept verbatim.
-    Returns [{"lang", "code"}], deduplicated, at most `limit` blocks of `size`
-    characters (a longer block is cut at a line break)."""
-    found, seen, loose = [], set(), []
-
-    def add(lang: str, code: str):
-        code = code.strip("\n").rstrip()
-        if len(code) > size:
-            code = code[:size].rsplit("\n", 1)[0] + "\n…"
-        key = re.sub(r"\s+", " ", code).strip()
-        if len(key) >= 4 and key not in seen and len(found) < limit:
-            seen.add(key)
-            found.append({"lang": lang, "code": code})
-
-    for text in texts:
-        if not text:
-            continue
-        for m in FENCE.finditer(text):
-            add(m.group(2).lower(), m.group(3))
-        prose = FENCE.sub("", text)
-        for line in prose.splitlines():
-            line = line.strip().lstrip(">").strip()
-            for cand in [*INLINE.findall(line), line]:
-                cand = cand.strip()
-                if COMMAND.match(cand) and len(cand) <= 200:
-                    loose.append(cand.removeprefix("$ "))
-                    break
-    if loose:
-        add("bash", "\n".join(dict.fromkeys(loose)))
-    return found
-
-
-def repo_facts(api: str, repo: dict, headers: dict) -> dict:
-    """What says whether a repository is alive and usable: language, license, the
-    date of the last commit on its default branch (the last push when the commits
-    can't be read) and whether it is archived. Stars as a rough sign of use."""
-    last = repo.get("pushed_at")
-    try:
-        r = httpx.get(f"{api}/commits", params={"per_page": 1, "sha": repo.get("default_branch") or ""},
-                      headers=headers, timeout=30)
-        if r.status_code == 200 and r.json():
-            last = r.json()[0]["commit"]["committer"]["date"]
-    except Exception as e:
-        print(f"[pipeline] last commit unknown: {e}", file=sys.stderr)
-    return {"language": repo.get("language"),
-            "license": (repo.get("license") or {}).get("spdx_id") or None,
-            "last_commit": (last or "")[:10] or None,
-            "archived": bool(repo.get("archived")),
-            "stars": repo.get("stargazers_count")}
 
 
 def fetch_github(url: str, cid: int) -> dict | None:
@@ -550,9 +562,8 @@ def fetch_github(url: str, cid: int) -> dict | None:
     result = {"path": None, "kind": "text", "author": repo["owner"]["login"],
               "text": repo.get("description"),
               "page": {"title": repo["full_name"], "description": repo.get("description"),
-                       "excerpt": readme[:3000], "repo": repo_facts(api, repo, headers),
-                       # Install and usage commands sit past the excerpt in most READMEs.
-                       "code": code_snippets(readme)}}
+                       "excerpt": readme[:3000]},
+              "repo": repo_facts(repo, api, headers), "code": snippets(markdown=readme)}
     raw = f"https://raw.githubusercontent.com/{repo['full_name']}/{repo.get('default_branch') or 'HEAD'}/"
     for match in README_MEDIA.finditer(readme):
         src = next(g for g in match.groups() if g)
@@ -570,6 +581,29 @@ def fetch_github(url: str, cid: int) -> dict | None:
             result["css"] = css
         return {**result, "path": shot, "kind": "image"}
     return result
+
+
+def repo_facts(repo: dict, api: str, headers: dict) -> dict:
+    """What decides whether a repository is still worth depending on: its
+    language, its license, the date of the last commit on its default branch and
+    whether it is archived. "checked" is the day they were read, so they can be
+    refreshed later. A license GitHub can't identify keeps its name ("Other");
+    none means no license file was found."""
+    last = repo.get("pushed_at")  # a push to any branch: the fallback when commits can't be listed
+    try:
+        r = httpx.get(f"{api}/commits", params={"per_page": 1, "sha": repo.get("default_branch") or "HEAD"},
+                      headers=headers, timeout=30)
+        commits = r.json() if r.status_code == 200 else None
+        if isinstance(commits, list) and commits:
+            last = ((commits[0].get("commit") or {}).get("committer") or {}).get("date") or last
+    except (httpx.HTTPError, ValueError) as e:
+        print(f"[pipeline] last commit unknown: {e}", file=sys.stderr)
+    license_ = repo.get("license") or {}
+    spdx = license_.get("spdx_id")
+    return {"name": repo["full_name"], "language": repo.get("language"),
+            "license": (spdx if spdx and spdx != "NOASSERTION" else license_.get("name") or "Other") if license_ else None,
+            "last_commit": str(last)[:10] if last else None, "archived": bool(repo.get("archived")),
+            "checked": date.today().isoformat()}
 
 
 FIGURE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")  # a markdown image, as trafilatura emits it
@@ -645,7 +679,8 @@ def fetch_page(url: str, cid: int, visible_text: bool = True) -> dict:
     page = {"title": title, "description": meta("og:description") or meta("description"),
             "excerpt": readable(html, str(r.url))[:3000] if visible_text else ""}
     result = {"path": None, "kind": "text", "author": host,
-              "text": "\n\n".join(x for x in (title, page["description"]) if x), "page": page}
+              "text": "\n\n".join(x for x in (title, page["description"]) if x), "page": page,
+              "code": snippets(html=html) if visible_text else []}
 
     if post := next((i for i in json_ld(html) if POST_TYPES & set(_types(i))), None):
         who = post.get("creator") or post.get("author")
@@ -907,8 +942,11 @@ def chat_openai(system: str, user: str, images: list[Path] | None, as_json: bool
 
 
 def unfence(raw: str) -> str:
-    """Cloud models sometimes wrap the answer in ```json or ```markdown."""
-    return re.sub(r"^\s*```[a-z]*[ \t]*\n?|\n?\s*```\s*$", "", raw)
+    """Cloud models sometimes wrap the answer in ```json or ```markdown. A fence
+    at the end goes only with one at the start: otherwise it closes a code block."""
+    if not (m := re.match(r"\s*```[a-z]*[ \t]*\n?", raw)):
+        return raw
+    return re.sub(r"\n?\s*```\s*$", "", raw[m.end():])
 
 
 def parse_json(raw: str):
@@ -934,8 +972,6 @@ Rules:
 - If the text isn't about ideas or practices (a product launch, an ad for a
   course or service, a list of tools, a UI demo, a caption), return {"ideas": []}.
 - English, whatever the language of the text. Leave a field empty rather than guess.
-- Commands, code and config the text gives are copied exactly, in backticks,
-  into "apply": never paraphrase or shorten them.
 """
 
 

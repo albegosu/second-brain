@@ -119,14 +119,17 @@ Structure:
   **Do:** and **Don't:** what the look depends on and what would break it.
   **Use it for:** one line.
 - tools topics: an "## Options" section with one "### <Tool name> [n]" block per
-  tool: **What it does:**, **Use it when:**, **Link:** (only a URL from that
-  source's "Links", never one you make up), **Notes:** (limits, platform, pricing,
-  only as stated), **Repo:** (the note's "Repository" line as is, when it has
-  one), **Try it:** (the note's commands from "Code"). Tools a source describes
-  in exactly the same words share one block headed with all their names
+  tool: **What it does:**, **Use it when:**, **Try it:** (the install or run
+  command from that source's "Code"), **Link:** (only a URL from that source's
+  "Links", never one you make up), **Notes:** (limits, platform, pricing, only as
+  stated; for a repository, its language, license, last commit date and whether
+  it's archived, from the note's "Repository"). Tools a source describes in
+  exactly the same words share one block headed with all their names
   ("### TypeUI · DesignMD [2]").
 - practices topics: an "## Ideas" section with one "### <Idea name> [n]" block per
-  idea: **Claim:**, **Why it matters:**, **How to apply:**, **Watch out:**.
+  idea: **Claim:**, **Why it matters:**, **How to apply:** (with the command,
+  prompt or config from the note's "Code" when the idea relies on one),
+  **Watch out:**.
 - With two or more patterns, styles, options or ideas: a "## Choosing" section, a
   few bullets on which one fits which situation.
 
@@ -135,16 +138,15 @@ Rules:
   (what the vision model actually saw) or "Key ideas" gets its own block, even if
   it only loosely fits the topic. For tools topics, every tool the notes describe
   gets a block.
-- A note's "Code" section is copied exactly, in fenced blocks with its language,
-  under the block it belongs to (**Try it:** for tools, **How to apply:** for
-  ideas, **How it works:** for patterns). Never paraphrase, shorten or invent
-  commands, flags, code or config; leave out the ones that don't belong.
 - Leave out a field that has nothing to say; never write "None" or "Not stated".
 - Ideas that only appear in a post's text or a page excerpt, not under "What it
   shows" (tip lists, generic advice), don't get blocks: list them briefly under a
   final "## Also mentioned" section, one bullet each with its [n].
 - Every block and every claim cites its sources with [n].
 - Only what the sources say: no invented details, numbers or framework names.
+- Commands, code and config come only from a note's "Code" section, copied
+  character for character in a fenced code block with its language. Never
+  paraphrase, shorten, merge or invent one, and quote only those a block needs.
 - Pattern names are short and specific ("Slide-to-confirm", "Staggered card
   reveal"), never the post's title.
 - Palettes, hex codes and style traits stay in the source notes, unless the topic
@@ -236,16 +238,36 @@ def next_capture_id() -> int:
     return max((capture_number(f.name) for f in source_files()), default=0) + 1
 
 
+def outside_code(text: str, fn) -> str:
+    """fn applied to the text between fenced code blocks, so a rewrite of the
+    Markdown never touches a command or a snippet."""
+    out, last = [], 0
+    for m in p.FENCE.finditer(text):
+        out += [fn(text[last:m.start()]), m.group(0)]
+        last = m.end()
+    return "".join(out + [fn(text[last:])])
+
+
+def without_code(text: str) -> str:
+    """The text without its fenced code blocks: a "### " or "## " line inside a
+    snippet (a Markdown config, a comment) is not a heading of the page."""
+    return p.FENCE.sub("", text)
+
+
 def strip_generated(body: str) -> str:
     """The body the model wrote, without the sections the code appends."""
-    return re.split(r"(?:^|\n)## (?:See also|Sources)\n", body, maxsplit=1)[0].strip()
+    code = [m.span() for m in p.FENCE.finditer(body)]
+    for m in re.finditer(r"(?:^|\n)## (?:See also|Sources)\n", body):
+        if not any(start <= m.start() < end for start, end in code):
+            return body[:m.start()].strip()
+    return body.strip()
 
 
 def pattern_names(body: str) -> list[str]:
     """The ### blocks under "## Patterns", "## Options", "## Ideas" or "## Styles",
     without citations."""
     names, section = [], None
-    for line in body.splitlines():
+    for line in without_code(body).splitlines():
         if line.startswith("## "):
             section = line[3:].strip()
         elif line.startswith("### ") and section in SECTIONS:
@@ -255,7 +277,7 @@ def pattern_names(body: str) -> list[str]:
 
 def section_label(body: str) -> str:
     """The block section a topic page uses, for the index."""
-    return next((s for s in SECTIONS if re.search(rf"^## {s}\s*$", body, re.M)), "Patterns")
+    return next((s for s in SECTIONS if re.search(rf"^## {s}\s*$", without_code(body), re.M)), "Patterns")
 
 
 def write_topic(path: Path, meta: dict, body: str):
@@ -366,35 +388,17 @@ def _quote(text: str, limit: int = 1500) -> str:
     return "\n".join(f"> {line}" if line.strip() else ">" for line in text.splitlines())
 
 
-def repo_line(facts: dict) -> str:
-    """A repository's facts on one line: "Language: Go · License: MIT · ..."."""
-    parts = [f"Language: {facts['language']}" if facts.get("language") else None,
-             f"License: {facts['license']}" if facts.get("license") and facts["license"] != "NOASSERTION" else None,
-             f"Last commit: {facts['last_commit']}" if facts.get("last_commit") else None,
-             "Archived: yes" if facts.get("archived") else "Archived: no",
-             f"Stars: {facts['stars']}" if facts.get("stars") is not None else None]
-    return " · ".join(x for x in parts if x)
-
-
-def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False, speech="") -> str:
+def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False, speech="",
+                code=(), repo=None) -> str:
     """Everything known about the capture. It is both the classifier's input and
     the body of the note, so it doesn't depend on the model that writes the wiki.
-    long_text keeps more of the page (an article is the capture itself)."""
+    long_text keeps more of the page (an article is the capture itself). code
+    and repo come from pipeline.snippets() and pipeline.repo_facts()."""
     out = []
     if note:
         out += ["## Note", "", _quote(note), ""]
-
-    # Near the top: a topic page is written from the head of each note.
-    if facts := (page or {}).get("repo"):
-        out += ["## Repository", "", repo_line(facts), ""]
-    # A repository's snippets come from its whole README, which the excerpt only begins.
-    code = p.code_snippets(note, text, None if (page or {}).get("code") else (page or {}).get("excerpt"))
-    seen = {c["code"] for c in code}
-    code += [c for c in (page or {}).get("code") or [] if c["code"] not in seen]
-    if code:
-        out += ["## Code", "", "Exactly as the source gives it:", ""]
-        for c in code[:8]:
-            out += [f"```{c.get('lang') or ''}", c["code"], "```", ""]
+    if repo:
+        out += ["## Repository", "", repo_line(repo), ""]
 
     shown = [pt for pt in patterns if isinstance(pt, dict) and pt.get("title")]
     if shown:
@@ -420,6 +424,12 @@ def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False,
             out += [f"### {idea['title']}", "", str(idea["claim"]), ""]
             out += [f"{label}: {idea[key]}" for key, label in (("why", "Why"), ("apply", "Apply")) if idea.get(key)]
             out.append("")
+
+    if code:
+        out += ["## Code", "", "Commands, code and config exactly as the source wrote them.", ""]
+        for snippet in code:
+            fence = "`" * max([3, *(len(run) + 1 for run in re.findall(r"`{3,}", snippet["code"]))])
+            out += [f"{fence}{snippet.get('lang') or ''}", snippet["code"], fence, ""]
 
     if style and (style.get("description") or style.get("palette")):
         out += ["## Visual style", ""]
@@ -453,6 +463,15 @@ def source_body(*, note, text, page, patterns, style, ideas=(), long_text=False,
         if page.get("excerpt"):
             out += [_quote(page["excerpt"], 6000 if long_text else 1200), ""]
     return "\n".join(out).strip()
+
+
+def repo_line(repo: dict) -> str:
+    """A repository's facts in one line, for the note and the model."""
+    facts = [repo.get("name"), repo.get("language"),
+             f"{repo['license']} license" if repo.get("license") else "no license found",
+             f"last commit {repo['last_commit']}" if repo.get("last_commit") else None,
+             "archived" if repo.get("archived") else None]
+    return " · ".join(x for x in facts if x) + (f" (checked {repo['checked']})" if repo.get("checked") else "")
 
 
 def classify(header: str, body: str, known: list[dict], intent: str | None = None) -> dict:
@@ -503,30 +522,38 @@ def compose(key: str, meta: dict) -> str:
               f"Category: {category}" + ("\nKind: visual style" if style_topic else "") +
               f"\n\nSource notes:\n\n{listing}")
     body = p.unfence(p.chat(COMPOSE, prompt, num_ctx=32768)).strip()
-    # Fields the model filled with nothing, despite the prompt.
-    body = re.sub(r"^\*\*[A-Za-z][^*\n]{0,40}:\*\*[ \t]*(?:none|n/?a|not (?:stated|specified|mentioned))\.?[ \t]*\n?",
-                  "", body, flags=re.M | re.I)
     body = re.sub(r"\A# .*\n+", "", body)  # the code writes the title
     body = strip_generated(body)  # in case it writes its own "See also" or sources
-    # Each "**Field:**" line as its own paragraph; otherwise Markdown joins them into one.
-    body = re.sub(r"(?<!\n)\n(\*\*[A-Z][^*\n]{0,40}:\*\*)", r"\n\n\1", body)
-    body = re.sub(r"^(### .+)\n(?!\n)", r"\1\n\n", body, flags=re.M)
-    # Steps written inline ("1. … 2. …") become a real numbered list.
-    body = re.sub(r"^(\*\*How it works:\*\*)[ \t]*(1\.\s.*\s2\.\s.*)$",
-                  lambda m: m.group(1) + "\n\n" + re.sub(r"\s+(?=\d+\.\s)", "\n", m.group(2)).strip(),
-                  body, flags=re.M)
+    body = outside_code(body, tidy).strip()
     if len(body) < 200:
         raise RuntimeError(f"topic page for {key} came back almost empty: {body[:120]!r}")
     return body
+
+
+def tidy(md: str) -> str:
+    """Fixes to the Markdown the model writes. Never applied inside code blocks."""
+    # Fields the model filled with nothing, despite the prompt.
+    md = re.sub(r"^\*\*[A-Za-z][^*\n]{0,40}:\*\*[ \t]*(?:none|n/?a|not (?:stated|specified|mentioned))\.?[ \t]*\n?",
+                "", md, flags=re.M | re.I)
+    # Each "**Field:**" line as its own paragraph; otherwise Markdown joins them into one.
+    md = re.sub(r"(?<!\n)\n(\*\*[A-Z][^*\n]{0,40}:\*\*)", r"\n\n\1", md)
+    md = re.sub(r"^(### .+)\n(?!\n)", r"\1\n\n", md, flags=re.M)
+    # Steps written inline ("1. … 2. …") become a real numbered list.
+    return re.sub(r"^(\*\*How it works:\*\*)[ \t]*(1\.\s.*\s2\.\s.*)$",
+                  lambda m: m.group(1) + "\n\n" + re.sub(r"\s+(?=\d+\.\s)", "\n", m.group(2)).strip(),
+                  md, flags=re.M)
 
 
 def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                  note: str | None, patterns: list, style: dict | None,
                  style_name: str | None = None, ideas: list | None = None,
                  intent: str | None = None, frames: list | None = None) -> dict:
+    # The post's own commands first (what its author chose to show), then the page's.
+    code = p.unique_snippets([*p.snippets(text=media.get("text") or ""), *(media.get("code") or [])])
     body = source_body(note=note, text=media.get("text"), page=media.get("page"),
                        patterns=patterns, style=style, ideas=ideas or [],
-                       long_text=bool(media.get("article")), speech=media.get("speech") or "")
+                       long_text=bool(media.get("article")), speech=media.get("speech") or "",
+                       code=code, repo=media.get("repo"))
     is_image = source == "image"  # a bare screenshot or photo, identified by a content hash
     header = ("From: image capture" if is_image else f"URL: {url}\nFrom: {source}") \
         + (f" · @{media['author']}" if media.get("author") else "")
@@ -569,7 +596,7 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                {"title": title, "summary": summary, "url": url, "source": source,
                 "author": media.get("author"), "captured": captured,
                 "topic": key, "tags": tags, "capture": cid, "note": note, "analyzed": ANALYZED,
-                **({"repo": repo} if (repo := (media.get("page") or {}).get("repo")) else {})},
+                **({"repo": media["repo"]} if media.get("repo") else {})},
                f"# {title}\n\n{summary}\n\n"
                f"Filed under [{meta['title']}](../../{key}.md)"
                f"{'' if is_image else f' · [original]({url})'}\n\n{shown}{body}")

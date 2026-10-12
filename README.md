@@ -107,14 +107,19 @@ wiki/
 - **Source notes** (`sources/`): written by code from what was extracted, with
   no reinterpretation. They hold your note, the patterns the model saw, the key
   ideas of an article or long text, the style with its pixel-measured palette,
-  the post or page text, and a link to the original.
+  the post or page text, and a link to the original. Commands, code and config
+  (a README's fenced blocks, a page's `<pre>` blocks, shell commands in a post)
+  are kept verbatim under **Code**, up to six blocks. A GitHub repository also
+  gets its language, license, last commit date and archived status, in the
+  note's frontmatter (`repo`) and under **Repository**.
 - **Topic pages:** the model picks the topic (reusing an existing one if it fits)
   and rewrites the page from all of its source notes, citing them as `[n]`. Pages
   are built for an agent about to implement something, with one block per item:
   patterns (**Use it when**, **How it works**, **Motion**, **Watch out**), styles
   as a DESIGN.md-like sheet (**Tokens**, **Composition**, **Do**, **Don't**),
-  tools (**What it does**, **Use it when**, **Link**) or ideas (**Claim**, **Why it
-  matters**, **How to apply**). A "Choosing" section follows when there are
+  tools (**What it does**, **Use it when**, **Try it**, **Link**, **Notes**) or ideas
+  (**Claim**, **Why it matters**, **How to apply**). Commands and code are copied
+  from the notes' **Code**, never paraphrased. A "Choosing" section follows when there are
   several, and "See also" links. The frontmatter, "See also", the sources list,
   the links a tool can use and the index are written by code, so a bad answer can
   at most spoil a text, never the navigation.
@@ -143,11 +148,6 @@ resumes:
 python -m worker.run --reanalyze
 ```
 
-Commands, code and config in a capture (fenced blocks, and lines like
-`npx …` or `pip install …` in the text, the note or a README) are kept verbatim
-in a "Code" section of its source note, and topic pages copy them as they are
-instead of summarizing them.
-
 Topic pages are regenerated from their sources, so manual edits to them don't
 last; put lasting context in the capture's note.
 
@@ -156,10 +156,19 @@ the whole wiki: merge duplicate topics, split catch-alls, move misfiled captures
 and relate topics. The code only applies proposals that keep every source note in
 exactly one topic and only links topics within the same category (across
 categories the model pairs things that merely share an area), rewrites the
-affected pages and commits the result. A topic far larger than the rest of its
-category (8+ sources and 2.5 times the category's median, visual styles aside)
-also gets a split request of its own, validated the same way: in the review of
-the whole wiki the model rarely splits anything. Locally:
+affected pages and commits the result.
+
+Catch-alls are found by counting, not by the model, which never proposed
+splitting them while reviewing the whole wiki and would sooner merge one into an
+even larger topic: a topic with 8 or more sources that holds a quarter of its
+category, or any topic with 15 or more, but never a `style-*` topic (its size is
+a look you keep saving). They are split first, so the plan reviews the finer
+topics. For each one
+the model gets only that topic's notes, numbered, and groups them into specific
+topics or into existing topics of the same category. The code keeps a note
+listed twice in its first group, gives back the notes of a new group with a
+single note or a vague name (`misc-…`, `other-…`), and leaves whatever no group
+took in the original topic. Locally:
 
 ```bash
 python -m worker.lint --dry-run        # print the validated plan, change nothing
@@ -232,7 +241,7 @@ the index counts those uses as verifiable.
 |---|---|
 | X | fxtwitter: video, GIF or image; X Articles as text, with their key ideas; the media of a quoted post; the page a post without media links to |
 | Instagram, LinkedIn | video through yt-dlp with your browser cookies (`BRAIN_COOKIES`); if yt-dlp can't get it, the video the page publishes as JSON-LD, and failing that (photos, carousels) the cover image |
-| GitHub repositories | description and README through the API, plus language, license, last commit, archived status and stars; as media, the first image, GIF or video in the README (badges skipped), else a screenshot of the project's homepage |
+| GitHub repositories | description and README through the API; as media, the first image, GIF or video in the README (badges skipped), else a screenshot of the project's homepage |
 | YouTube, Vimeo, TikTok, Bluesky and every other site yt-dlp has an extractor for | the video through yt-dlp, at most 720p and 10 minutes; if it can't be downloaded, the page's thumbnail and description |
 | Direct links to an image or a video | the file itself |
 | Any other site (news, articles) | title, description and main text (trafilatura, without navigation or banners); the video or post from its JSON-LD if present, otherwise a screenshot of the rendered page (headless Chrome), the article's own figures and `og:image` |
