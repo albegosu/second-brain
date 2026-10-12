@@ -117,7 +117,7 @@ class AgentsMd(unittest.TestCase):
         return {(t["key"], i["name"]): i for t in agents_md.practices() for i in t["ideas"]}
 
     def test_idea_blocks(self):
-        blocks = agents_md.idea_blocks(HARNESS)
+        blocks = wiki.blocks(HARNESS, "Ideas")
         self.assertEqual([(b["name"], b["cites"]) for b in blocks],
                          [("Durable State", [1, 2]), ("Small Steps", [1]), ("Untested", [2])])
         first = blocks[0]

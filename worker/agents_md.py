@@ -44,9 +44,6 @@ PATH = "AGENTS.md"
 TRY_PER_TOPIC = 3
 RULE_CHARS = 220  # a worded rule or reason longer than this is not one line
 
-IDEA = re.compile(r"^### (.+?)\s*\[(\d+(?:\s*,\s*\d+)*)\]\s*$")
-FIELD = re.compile(r"^\*\*([A-Z][^*\n]{0,40}):\*\*[ \t]*(.*)$")
-CITES = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\]")
 # Wording that isn't a plain rule: links, capture numbers, Markdown.
 BAD = re.compile(r"https?://|#\d|\[|\]|`|\*\*|^\s*[-*#>]", re.M)
 
@@ -81,41 +78,6 @@ Rules:
 
 # ---------------------------------------------------------------- evidence
 
-def idea_blocks(body: str) -> list[dict]:
-    """The "### Name [n]" blocks under "## Ideas": name, cited source numbers,
-    fields (claim, why it matters, how to apply...) and code blocks. A heading
-    inside a code block is not an idea."""
-    codes = []
-
-    def hold(m):
-        codes.append({"lang": m.group(2).lower(), "code": m.group(3).strip("\n").rstrip()})
-        return f"\x00{len(codes) - 1}\x00"
-
-    blocks, section, current, field = [], None, None, None
-    for line in p.FENCE.sub(hold, body).splitlines():
-        if line.startswith("## "):
-            section, current = line[3:].strip(), None
-        elif line.startswith("### "):
-            m = IDEA.match(line) if section == "Ideas" else None
-            current = {"name": m.group(1).strip(), "cites": [int(n) for n in re.findall(r"\d+", m.group(2))],
-                       "fields": {}, "code": []} if m else None
-            if current:
-                blocks.append(current)
-            field = None
-        elif current is None:
-            continue
-        elif m := re.fullmatch(r"\s*\x00(\d+)\x00\s*", line):
-            current["code"].append(codes[int(m.group(1))])
-        elif m := FIELD.match(line):
-            field = m.group(1).lower()
-            current["fields"][field] = m.group(2).strip()
-        elif field and line.strip():  # a field written over several lines or as a list
-            current["fields"][field] = f"{current['fields'][field]} {line.strip()}".strip()
-    for b in blocks:
-        b["fields"] = {k: CITES.sub("", v).strip() for k, v in b["fields"].items()}
-    return blocks
-
-
 def in_notes(code: str, rels: list[str]) -> bool:
     """Whether a code block is one a cited source note recorded under "Code"."""
     for rel in rels:
@@ -136,7 +98,7 @@ def practices() -> list[dict]:
         meta, body = wiki.read_page(wiki.WIKI / f"{t['key']}.md")
         sources = meta.get("sources") or []
         ideas = []
-        for b in idea_blocks(body):
+        for b in wiki.blocks(body, "Ideas"):
             rels = [sources[n - 1] for n in b["cites"] if 1 <= n <= len(sources)]
             notes = [wiki.read_page(wiki.WIKI / rel)[0] for rel in rels if (wiki.WIKI / rel).exists()]
             captures = sorted({int(n.get("capture") or wiki.capture_number(rel)) for rel, n in zip(rels, notes)})
