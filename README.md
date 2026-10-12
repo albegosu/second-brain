@@ -270,7 +270,11 @@ and the facts recorded at capture time stand in when GitHub can't be reached.
 python -m worker.stack                 # rewrite wiki/stack.md and commit it
 python -m worker.stack --dry-run       # print it, change nothing
 python -m worker.stack --offline       # no GitHub calls
+GITHUB_TOKEN=$(gh auth token) python -m worker.stack   # locally: past 60 GitHub calls an hour
 ```
+
+If GitHub refuses halfway through (a rate limit), the previous `stack.md` is
+kept rather than replaced by one missing facts.
 
 **Usage log.** When Claude builds something that takes from the wiki, the skill
 records it with `python -m worker.used <capture numbers> --project … --what …
