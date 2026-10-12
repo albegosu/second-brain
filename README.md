@@ -108,10 +108,11 @@ wiki/
   no reinterpretation. They hold your note, the patterns the model saw, the key
   ideas of an article or long text, the style with its pixel-measured palette,
   the post or page text, and a link to the original. Commands, code and config
-  (a README's fenced blocks, a page's `<pre>` blocks, shell commands in a post)
-  are kept verbatim under **Code**, up to six blocks. A GitHub repository also
-  gets its language, license, last commit date and archived status, in the
-  note's frontmatter (`repo`) and under **Repository**.
+  (a README's fenced blocks, a page's `<pre>` blocks, shell commands in your
+  note, a post or its page) are kept verbatim under **Code**, up to six blocks.
+  A GitHub repository also gets its language, license, last commit date,
+  archived status and stars, in the note's frontmatter (`repo`) and under
+  **Repository**.
 - **Topic pages:** the model picks the topic (reusing an existing one if it fits)
   and rewrites the page from all of its source notes, citing them as `[n]`. Pages
   are built for an agent about to implement something, with one block per item:
