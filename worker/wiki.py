@@ -353,9 +353,12 @@ def retarget_source(rel: str, key: str, topic_title: str):
     write_page(path, meta, body)
 
 
-def detach(cid: int):
+def detach(cid: int) -> list[str]:
     """Re-analysis: the previous note leaves its topic. The topic keeps its current
-    text until it's rewritten; a topic left without sources is deleted."""
+    text until it's rewritten; a topic left without sources is deleted. Returns
+    the keys of the topics it left that still have sources: their text still
+    describes the capture and cites it by a number their list no longer has."""
+    left = []
     for old in (WIKI / "sources").glob(f"*/{cid:04d}-*.jpg"):
         old.unlink()
     for old in (WIKI / "sources").glob(f"*/{cid:04d}-*.md"):
@@ -368,8 +371,10 @@ def detach(cid: int):
             meta["sources"] = [s for s in meta["sources"] if s != rel]
             if meta["sources"]:
                 write_topic(page, meta, body)
+                left.append(topic_key(page))
             else:
                 page.unlink()
+    return left
 
 
 def build_index():
@@ -614,7 +619,7 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
     header = ("From: image capture" if is_image else f"URL: {url}\nFrom: {source}") \
         + (f" · @{media['author']}" if media.get("author") else "")
 
-    detach(cid)
+    left = detach(cid)
     known = topics()
     cls = classify(header, body, known, intent)
 
@@ -660,6 +665,15 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
     meta["sources"] = sorted({*meta.get("sources", []), rel}, key=capture_number)
     meta["updated"] = date.today().isoformat()
     write_topic(page, meta, compose(key, meta))
+    # Re-filed under another topic: the one it left is rewritten from the sources
+    # it has left, so no block describes the capture or cites a number gone from
+    # its list. Nothing else would rewrite it: lint only recomposes topics whose
+    # sources change during the pass.
+    for old in left:
+        if old != key:
+            old_meta, _ = read_page(WIKI / f"{old}.md")
+            old_meta["updated"] = date.today().isoformat()
+            write_topic(WIKI / f"{old}.md", old_meta, compose(old, old_meta))
     build_index()
     return {"category": category, "topic": slug, "topic_title": meta["title"], "title": title,
             "summary": summary, "new_topic": new_topic, "source": rel}
