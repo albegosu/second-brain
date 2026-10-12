@@ -503,6 +503,8 @@ def fetch_github(url: str, cid: int) -> dict | None:
             print(f"[pipeline] README media dropped: {e}", file=sys.stderr)
             break
     if repo.get("homepage") and (shot := screenshot(repo["homepage"], cid)):
+        if css := page_css.read(repo["homepage"], chrome()):  # the homepage's exact colors, type and radius
+            result["css"] = css
         return {**result, "path": shot, "kind": "image"}
     return result
 
