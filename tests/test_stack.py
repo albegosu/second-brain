@@ -99,7 +99,8 @@ class Stack(unittest.TestCase):
 
     def test_the_map(self):
         with self.github():
-            text = stack.generate()
+            text, refused = stack.generate()
+        self.assertFalse(refused)
         self.assertIn(f"Repository facts as of {TODAY}.", text)
         self.assertIn(f"## Used in builds\n\n- **Agent CLI** (Coding Agents): Used 1×, last in acme-web on {TODAY}. "
                       "(#60)", text)
@@ -123,14 +124,24 @@ class Stack(unittest.TestCase):
                                       response=httpx.Response(403))
         with mock.patch.object(stack.p, "github_facts", side_effect=lambda n: names.append(n) or (_ for _ in ()).throw(limit)), \
                 mock.patch("sys.stderr"):
-            text = stack.generate()
+            text, refused = stack.generate()
+        self.assertTrue(refused)
         self.assertEqual(names, ["acme/agent"])  # one refusal and it stops asking
         self.assertIn("[acme/agent: Python, MIT license, last commit 2026-01-01, checked 2026-02-01]", text)
         self.assertIn("[acme/old-lib](https://github.com/acme/old-lib)", text)  # nothing known: just the name
         self.assertNotIn("## Stale", text)
         with self.github(names := []):
-            stack.generate(online=False)
+            self.assertFalse(stack.generate(online=False)[1])  # offline by choice is not a refusal
         self.assertEqual(names, [])
+
+    def test_a_refusal_keeps_the_previous_file(self):
+        limit = httpx.HTTPStatusError("rate limit", request=httpx.Request("GET", "https://api.github.com"),
+                                      response=httpx.Response(403))
+        with mock.patch.object(stack.p, "github_facts", side_effect=limit), mock.patch("sys.stderr"):
+            self.assertTrue(stack.build())  # nothing to keep: the partial file is better than none
+            (self.wiki / stack.PATH).write_text("last week's map\n")
+            self.assertFalse(stack.build())
+        self.assertEqual((self.wiki / stack.PATH).read_text(), "last week's map\n")
 
     def test_build_links_it(self):
         with self.github():

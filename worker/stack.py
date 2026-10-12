@@ -4,6 +4,7 @@
     python -m worker.stack                 # rewrite wiki/stack.md and commit it
     python -m worker.stack --dry-run       # print the map, change nothing
     python -m worker.stack --offline       # no GitHub calls: only the facts source notes recorded
+    GITHUB_TOKEN=$(gh auth token) python -m worker.stack   # locally, past the 60 calls an hour without one
 
 Each tools topic is a job and each "### Tool [n]" block of its page a tool.
 Everything is decided by code, no model:
@@ -15,7 +16,9 @@ Everything is decided by code, no model:
 A tool's repository is the GitHub repository its Link points to, or, when a
 source note describes that tool alone, the repository the note captured. The
 facts are read from GitHub on every rewrite; when it can't be reached (offline,
-a rate limit) the facts a source note recorded at capture time stand in. Uses
+a rate limit) the facts a source note recorded at capture time stand in, and if
+GitHub refuses halfway through, the previous stack.md is kept: a partial
+refresh would drop facts it had. Uses
 are by capture, so a capture that names several tools counts for all of them.
 The skill tells the agent to check this file before adding a dependency.
 Refreshed after the weekly lint pass.
@@ -80,11 +83,11 @@ def tools() -> list[dict]:
     return out
 
 
-def facts(items: list[dict], online: bool = True) -> dict[str, dict]:
-    """Each repository's facts, read from GitHub now. A repository that is gone
-    is marked so. When GitHub can't be reached, no more calls are made and the
-    facts a source note recorded stand in."""
-    out = {}
+def facts(items: list[dict], online: bool = True) -> tuple[dict[str, dict], bool]:
+    """Each repository's facts, read from GitHub now, and whether GitHub refused.
+    A repository that is gone is marked so. After a refusal no more calls are
+    made and the facts a source note recorded stand in."""
+    out, refused = {}, False
     for name in sorted({i["repo"] for i in items if i["repo"]}):
         if online:
             try:
@@ -92,10 +95,10 @@ def facts(items: list[dict], online: bool = True) -> dict[str, dict]:
                 continue
             except (httpx.HTTPError, ValueError, KeyError) as e:  # a rate limit, no network: stop asking
                 print(f"[stack] GitHub unreachable, using recorded facts: {e}", file=sys.stderr)
-                online = False
+                online, refused = False, True
         if recorded := next((i["recorded"] for i in items if i["repo"] == name and i["recorded"]), None):
             out[name] = recorded
-    return out
+    return out, refused
 
 
 def stale(f: dict | None, today: date) -> str | None:
@@ -173,19 +176,27 @@ def render(items: list[dict], found: dict[str, dict], today: date) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def generate(online: bool = True) -> str | None:
+def generate(online: bool = True) -> tuple[str, bool] | None:
+    """(the file's text, whether GitHub refused), or None when there are no tools."""
     items = tools()
     if not items:
         return None
-    return render(items, facts(items, online), date.today())
+    found, refused = facts(items, online)
+    return render(items, found, date.today()), refused
 
 
 def build(online: bool = True) -> bool:
-    """Rewrites wiki/stack.md; removes it when there are no tools. False then."""
-    text = generate(online)
-    if not text:
+    """Rewrites wiki/stack.md; removes it when there are no tools. Keeps the
+    previous one when GitHub refused halfway. False when nothing was written."""
+    made = generate(online)
+    if not made:
         (wiki.WIKI / PATH).unlink(missing_ok=True)
         print("[stack] no tools topic with tools: no stack.md")
+        return False
+    text, refused = made
+    if refused and (wiki.WIKI / PATH).exists():
+        print("[stack] GitHub refused (a rate limit?): kept the previous stack.md. Locally, set GITHUB_TOKEN, "
+              "for example GITHUB_TOKEN=$(gh auth token)", file=sys.stderr)
         return False
     (wiki.WIKI / PATH).write_text(text)
     return True
@@ -197,7 +208,8 @@ def main():
     ap.add_argument("--offline", action="store_true", help="no GitHub calls: only the facts source notes recorded")
     args = ap.parse_args()
     if args.dry_run:
-        sys.stdout.write(generate(not args.offline) or "[stack] no tools yet\n")
+        made = generate(not args.offline)
+        sys.stdout.write(made[0] if made else "[stack] no tools yet\n")
         return
     build(not args.offline)
     wiki.build_index()
