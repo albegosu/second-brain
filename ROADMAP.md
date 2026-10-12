@@ -88,6 +88,23 @@ is rough priority.
   *Inspired by Karpathy's LLM wiki pattern.*
 - **Normalized tags.** Map free-form tags onto a controlled set so they work as
   filters, the way facets already do.
+- ~~**Technical captures, verbatim.**~~ Done: commands, code and config are kept
+  exactly as the source wrote them in the source note (a README's fenced blocks,
+  a page's `<pre>` blocks, shell commands in a post) and topic pages copy them
+  instead of paraphrasing. GitHub repositories record language, license, last
+  commit and archived status. The lint pass finds catch-all topics by counting
+  and splits each one in its own model call, with numbered notes the code can
+  check. Captures filed before this get them when re-analyzed
+  (`python -m worker.run --url <url> --reanalyze`).
+- **Practices as an `AGENTS.md`.** The `DESIGN.md` equivalent for how to work:
+  the `practices` ideas turned into rules a coding agent follows, in the
+  `AGENTS.md` format Claude Code, Cursor and Codex read. Code decides what goes
+  in from counts and evidence; a model only writes the prose.
+  [#55](https://github.com/albegosu/second-brain/issues/55)
+- **`stack.md`, a tool map.** Saved tools by job: which were used (the usage
+  log), which are only to try and which are stale (archived, no recent commit).
+  The skill checks it before adding a dependency.
+  [#56](https://github.com/albegosu/second-brain/issues/56)
 - ~~**Implementation-oriented sections.**~~ Done: pages are rewritten from their
   sources as one block per pattern (use it when, steps, motion, pitfalls), a
   "Choosing" section, and an index that lists every pattern.

@@ -19,12 +19,12 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed, one `### <name> [n]` block per item:
    - `## Patterns` (design, features): **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
    - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. To build with one, generate its DESIGN.md (see "When building from it").
-   - `## Options` (tools): **What it does**, **Use it when**, **Link** (only URLs found in the sources) and **Notes**.
+   - `## Options` (tools): **What it does**, **Use it when**, **Try it** (the install or run command, verbatim), **Link** (only URLs found in the sources) and **Notes** (for a repository: language, license, last commit, archived).
    - `## Ideas` (practices): **Claim**, **Why it matters**, **How to apply**, **Watch out**.
    - `## Choosing`: which one fits which situation, when there are several.
    - `## See also`: related topics of the same category worth opening when the task spans them. A relevant tool page won't be linked from a design page, so check the index's tools section too.
    - `## Sources`: citations like `[2]` point here.
-3. Open a source note (`wiki/sources/…`) only when you need the specifics: the user's note, the measured palette, the original post text or the link to the video.
+3. Open a source note (`wiki/sources/…`) only when you need the specifics: the user's note, the measured palette, the original post text, the link to the video, the commands and code under **Code** (verbatim from the source) or a repository's facts under **Repository** (as of the date it says it was checked).
    - Visual captures keep a `.jpg` next to their note (linked as `frames` in the topic's sources list): up to four frames in time order, left to right and top to bottom, or the image itself. Before building a look, a layout or an interaction from the wiki, open that image with the Read tool and look at it. The text describes the reference; the image is the reference.
 4. If the index doesn't obviously cover it, search. Everything is in English:
    ```bash
@@ -42,7 +42,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
   The slug is the topic's file name (`style-editorial`, or just `editorial`); without `--out` it prints. A topic with several looks (one `### Name [n]` block each) gives its dominant one and names the others; add `--look "<name>"` to build from another. A model writes only the overview and rules; `--no-model` skips it (a template writes them) when Ollama isn't reachable. The file carries capture numbers for the usage log but no links or post text; it is still derived from private captures, so ask before committing it to a public repository, and never overwrite a DESIGN.md the project already has.
 - Steps, animated properties and easing come from a vision model looking at frames. They are good starting points. Durations are usually omitted on purpose, because they cannot be measured from stills.
 - Palettes in source notes are measured from pixels but include the demo's content colors. Pick the UI ones. A DESIGN.md marks its primary **Low confidence** when no measured accent is vivid or the wiki's words name other colors: look at the frames and take the accent the interface actually uses.
-- Adapt to the project's own design tokens and stack. The wiki never stores code.
+- Adapt to the project's own design tokens and stack. The only code the wiki holds is what a source showed (a README's install line, a config from a post), copied verbatim: check a command against the tool's current docs before running it.
 - When something you built actually takes from captures, record it once, at the end, with their capture numbers (the `0007` in `sources/2026-09/0007-….md`). It shows the user which saves turn out useful. A save you only read or looked at is not logged, even if it informed your thinking.
   ```bash
   cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.used 7 21 --project "<repository or product>" --what "<what was taken, in one line>" --ref "<commit or pull request URL>"

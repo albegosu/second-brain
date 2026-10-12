@@ -107,14 +107,19 @@ wiki/
 - **Source notes** (`sources/`): written by code from what was extracted, with
   no reinterpretation. They hold your note, the patterns the model saw, the key
   ideas of an article or long text, the style with its pixel-measured palette,
-  the post or page text, and a link to the original.
+  the post or page text, and a link to the original. Commands, code and config
+  (a README's fenced blocks, a page's `<pre>` blocks, shell commands in a post)
+  are kept verbatim under **Code**, up to six blocks. A GitHub repository also
+  gets its language, license, last commit date and archived status, in the
+  note's frontmatter (`repo`) and under **Repository**.
 - **Topic pages:** the model picks the topic (reusing an existing one if it fits)
   and rewrites the page from all of its source notes, citing them as `[n]`. Pages
   are built for an agent about to implement something, with one block per item:
   patterns (**Use it when**, **How it works**, **Motion**, **Watch out**), styles
   as a DESIGN.md-like sheet (**Tokens**, **Composition**, **Do**, **Don't**),
-  tools (**What it does**, **Use it when**, **Link**) or ideas (**Claim**, **Why it
-  matters**, **How to apply**). A "Choosing" section follows when there are
+  tools (**What it does**, **Use it when**, **Try it**, **Link**, **Notes**) or ideas
+  (**Claim**, **Why it matters**, **How to apply**). Commands and code are copied
+  from the notes' **Code**, never paraphrased. A "Choosing" section follows when there are
   several, and "See also" links. The frontmatter, "See also", the sources list,
   the links a tool can use and the index are written by code, so a bad answer can
   at most spoil a text, never the navigation.
@@ -151,7 +156,19 @@ the whole wiki: merge duplicate topics, split catch-alls, move misfiled captures
 and relate topics. The code only applies proposals that keep every source note in
 exactly one topic and only links topics within the same category (across
 categories the model pairs things that merely share an area), rewrites the
-affected pages and commits the result. Locally:
+affected pages and commits the result.
+
+Catch-alls are found by counting, not by the model, which never proposed
+splitting them while reviewing the whole wiki and would sooner merge one into an
+even larger topic: a topic with 8 or more sources that holds a quarter of its
+category, or any topic with 15 or more, but never a `style-*` topic (its size is
+a look you keep saving). They are split first, so the plan reviews the finer
+topics. For each one
+the model gets only that topic's notes, numbered, and groups them into specific
+topics or into existing topics of the same category. The code keeps a note
+listed twice in its first group, gives back the notes of a new group with a
+single note or a vague name (`misc-…`, `other-…`), and leaves whatever no group
+took in the original topic. Locally:
 
 ```bash
 python -m worker.lint --dry-run        # print the validated plan, change nothing
