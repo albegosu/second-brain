@@ -12,8 +12,9 @@ an even larger topic. Then, on those finer topics, the model proposes merging
 duplicate topics, splitting catch-all topics, moving misfiled captures and
 relating topics. The code validates the plan (every source note ends up in
 exactly one topic, nothing is dropped) and applies only what passes. It then
-refreshes the taste profile (worker/taste.py) and its DESIGN.md
-(worker/design_md.py). Runs weekly on GitHub Actions (.github/workflows/lint.yml).
+refreshes the taste profile (worker/taste.py), its DESIGN.md
+(worker/design_md.py) and the practices' AGENTS.md (worker/agents_md.py). Runs
+weekly on GitHub Actions (.github/workflows/lint.yml).
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ import sys
 from collections import Counter
 from datetime import date
 
+from . import agents_md
 from . import design_md
 from . import hypar
 from . import pipeline as p
@@ -384,13 +386,19 @@ def main():
     except Exception as e:  # so is its DESIGN.md
         print(f"[lint] DESIGN.md not refreshed: {e}", file=sys.stderr)
         designed = False
-    if refreshed or designed:
+    try:
+        agents = agents_md.build()
+    except Exception as e:  # and so is the AGENTS.md
+        print(f"[lint] AGENTS.md not refreshed: {e}", file=sys.stderr)
+        agents = False
+    if refreshed or designed or agents:
         wiki.build_index()
-    if log or rewritten or refreshed or designed:
+    if log or rewritten or refreshed or designed or agents:
         run.commit_wiki("docs(wiki): lint pass",
                         "\n".join([*log, *(f"rewrote {k}" for k in rewritten), *(f"note: {n}" for n in notes),
                                     *(["refreshed taste profile"] if refreshed else []),
-                                    *(["refreshed DESIGN.md"] if designed else [])]))
+                                    *(["refreshed DESIGN.md"] if designed else []),
+                                    *(["refreshed AGENTS.md"] if agents else [])]))
         hypar.sync_index(wiki.WIKI)
 
 
