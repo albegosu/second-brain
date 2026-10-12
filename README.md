@@ -165,10 +165,10 @@ category, or any topic with 15 or more, but never a `style-*` topic (its size is
 a look you keep saving). They are split first, so the plan reviews the finer
 topics. For each one
 the model gets only that topic's notes, numbered, and groups them into specific
-topics or into existing topics of the same category. The code keeps a note
-listed twice in its first group, gives back the notes of a new group with a
-single note or a vague name (`misc-…`, `other-…`), and leaves whatever no group
-took in the original topic. Locally:
+topics or into existing topics of the same category; a note with no pair gets a
+topic of its own rather than one that doesn't fit. The code keeps a note listed
+twice in its first group, gives back the notes of a group with a vague name
+(`misc-…`, `other-…`), and leaves whatever no group took in the original topic. Locally:
 
 ```bash
 python -m worker.lint --dry-run        # print the validated plan, change nothing
