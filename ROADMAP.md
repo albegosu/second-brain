@@ -48,6 +48,11 @@ is rough priority.
   first item as before.
 - **Reliable Instagram reels from GitHub Actions,** where there are no browser
   cookies and data-center IPs get blocked more often.
+- **Older captures brought up to date.** Narration
+  ([#51](https://github.com/albegosu/second-brain/issues/51)), code and
+  repository facts ([#69](https://github.com/albegosu/second-brain/issues/69))
+  for captures filed before those extractors, without running the model over
+  every capture again.
 
 ## Wiki: organized for an agent to use
 
@@ -80,6 +85,10 @@ is rough priority.
 - ~~**Usage log.**~~ Done: `worker/used.py` records which captures shaped a build;
   the index shows uses per topic. `--ref` links each line to the commit or pull
   request it shaped, and the index counts those as verifiable.
+- **Usage by idea or tool.** The usage log records captures, so a build that
+  took one idea or one tool counts for everything its capture holds. Naming the
+  item lets AGENTS.md and stack.md promote only that one.
+  [#68](https://github.com/albegosu/second-brain/issues/68)
 - **Topic hierarchy.** When a category grows, group topics into clusters and
   subtopics so the index stays scannable in one read.
   *Inspired by ContextBolt's topic clusters.*
