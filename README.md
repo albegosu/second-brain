@@ -4,7 +4,7 @@
 and turns your taste into a DESIGN.md your coding agent builds from.**
 
 <p align="center">
-  <img src="docs/readme/flow.svg" width="100%" alt="The flow in four steps: share a post, page, screenshot or photo from any app; a vision model reads it, measures its palette and files it into a wiki topic; the taste becomes a DESIGN.md with color, type and radius tokens; a coding agent builds a card with those tokens.">
+  <img src="docs/readme/flow.svg" width="100%" alt="One capture, animated end to end: shared from a phone to second-brain, it is scanned by a vision model that pulls out its traits and palette and files it under its topic. The swatches fly into the DESIGN.md tokens, and a card paints itself with them, ending on the accent button.">
 </p>
 
 - **Save from anywhere.** Share a post from X, Instagram or LinkedIn, any web page,
