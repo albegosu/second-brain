@@ -75,8 +75,8 @@ DESIGN_MD_LINT=1 python -m unittest discover tests   # also the DESIGN.md spec l
   project refs or ntfy topics. Use your own material or synthetic examples.
 - **Dependencies:** add one only when the standard library or an existing
   dependency can't reasonably do the job, and say why in the pull request.
-- **Docs:** update [README.md](README.md) when behavior or settings change, and
-  [ROADMAP.md](ROADMAP.md) when you complete or add an item.
+- **Docs:** update [README.md](README.md) or [docs/](docs) when behavior or
+  settings change, and [ROADMAP.md](ROADMAP.md) when you complete or add an item.
 
 ## Pull requests
 
