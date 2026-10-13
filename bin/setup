@@ -444,7 +444,7 @@ Next:
 """ + (f"""  • Run {sql_file} in the Supabase SQL editor
     (https://supabase.com/dashboard/project/{ref}/sql/new).
 """ if sql_file else "") + devices + f"""  • Phone notifications: install the ntfy app and subscribe to {ntfy_topic}
-""" + (f"""  • Your engine {engine} is private: add a read-only deploy key as the README explains.
+""" + (f"""  • Your engine {engine} is private: add a read-only deploy key as docs/self-hosting.md explains.
 """ if engine_private else "") + """  • Share something: it shows up in the wiki within a few minutes.
 """)
 
