@@ -73,16 +73,14 @@ and how to run the worker on your own computer instead.
 
 ## Capture from
 
-- **iPhone or Mac:** the Shortcut, from any app's share sheet.
-  [The Shortcut](docs/capture.md#the-shortcut)
-- **Android and any desktop browser:** the capture page,
-  [albegosu.github.io/second-brain](https://albegosu.github.io/second-brain/),
-  installed as an app on Android so it shows up in every share sheet; on a
+- **iPhone or Mac:** [the Shortcut](docs/capture.md#the-shortcut), from any
+  app's share sheet.
+- **Android and any desktop browser:** [the capture page](docs/capture.md#android-and-desktop),
+  [albegosu.github.io/second-brain](https://albegosu.github.io/second-brain/).
+  Installed as an app on Android, it shows up in every share sheet; on a
   desktop, paste a link or drop an image.
-  [Android and desktop](docs/capture.md#android-and-desktop)
-- **The command line:** `python -m worker.run --url <link>` or
-  `--image <file>`, with an optional `--note`, without the inbox.
-  [Command line](docs/capture.md#command-line)
+- **[The command line](docs/capture.md#command-line):** `python -m worker.run --url <link>`
+  or `--image <file>`, with an optional `--note`, without the inbox.
 
 X, Instagram, LinkedIn, GitHub repositories, YouTube and every site yt-dlp
 supports, any other page, images and the speech in videos:
@@ -99,21 +97,20 @@ ln -s ~/Developer/second-brain/skill/second-brain ~/.claude/skills/second-brain
 ```
 
 Clients that don't load skills (Claude Desktop, Cursor, Windsurf, Zed…) can read
-it over MCP with `bin/second-brain-mcp`, a read-only server on stdio.
-[Other agents (MCP)](docs/integrations.md#other-agents-mcp)
+it over MCP with `bin/second-brain-mcp`, a
+[read-only server on stdio](docs/integrations.md#other-agents-mcp).
 
 ## Run it your way
 
-- **GitHub Actions (the default):** the worker runs on GitHub Actions and
-  doesn't depend on any computer. `bin/setup` sets it up; a private fork of the
-  engine needs a deploy key.
-  [Worker on GitHub Actions](docs/self-hosting.md#worker-on-github-actions-recommended)
-- **All on your Mac:** inbox and worker together, reachable from the iPhone on
-  the same Wi-Fi, started with `bin/second-brain`.
-  [All on this Mac](docs/self-hosting.md#all-on-this-mac-no-actions)
-- **Supabase inbox:** a free Supabase project queues captures instead of the
-  inbox repository (`bin/setup --inbox supabase`).
-  [Supabase inbox](docs/self-hosting.md#supabase-inbox)
+- **[GitHub Actions](docs/self-hosting.md#worker-on-github-actions-recommended)
+  (the default):** the worker doesn't depend on any computer. `bin/setup` sets
+  it up; a private fork of the engine needs a deploy key.
+- **[All on your Mac](docs/self-hosting.md#all-on-this-mac-no-actions):** inbox
+  and worker together, reachable from the iPhone on the same Wi-Fi, started with
+  `bin/second-brain`.
+- **[Supabase inbox](docs/self-hosting.md#supabase-inbox):** a free Supabase
+  project queues captures instead of the inbox repository
+  (`bin/setup --inbox supabase`).
 
 Running the worker on your own computer (all on your Mac, or the command line)
 needs a [local install](docs/self-hosting.md#install-the-worker-locally).
