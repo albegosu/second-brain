@@ -109,9 +109,15 @@ The local inbox runs on your Mac: see [All on this Mac](self-hosting.md#all-on-t
 
 The capture page does what the Shortcut does, for Android and any desktop
 browser: [albegosu.github.io/second-brain/](https://albegosu.github.io/second-brain/).
-It's a static page (in [`web/`](../web)) that calls the same Supabase functions,
-so nothing changes on the server. It works with either [inbox](#two-inboxes).
+It's a static page (in [`web/`](../web)) that sends to the same inbox as the
+Shortcut, so nothing changes on the server. It works with either
+[inbox](#two-inboxes).
 
+- **First visit:** with no settings, it opens on a short welcome: what
+  second-brain does, the animation from the top of the README, **Set it up**
+  (the [quick start](../README.md#quick-start)) and **I already ran bin/setup**,
+  which opens Connect. A share, the bookmarklet or a setup link skips it and goes
+  straight to Connect, keeping what was shared.
 - **Connect it:** scan the QR code `bin/setup` prints, open or paste its setup
   link, or fill in the inbox by hand (GitHub: the inbox repository and the
   capture token; Supabase: project URL, publishable key and capture token). The
@@ -133,7 +139,10 @@ so nothing changes on the server. It works with either [inbox](#two-inboxes).
   note, and sends `intent: … — note`. Images are converted to JPEG (at most
   2560 px on the long side) and sent to `capture_image`.
 - **Offline or paused project:** a capture that can't be sent waits in the
-  browser and is retried when you open the page again or come back online.
+  browser, shown next to the send button with **Retry now**, and is retried when
+  you open the page again or come back online.
+- **Light and dark:** it follows the system's theme. The dark one is derived from
+  the same Paper and Ink tokens.
 
 ### Host your own copy
 
@@ -141,7 +150,9 @@ It's served by GitHub Pages from this repository (`.github/workflows/pages.yml`)
 To host your own copy, publish `web/` anywhere with HTTPS; the page has no build
 step and loads nothing from other sites. Change the link-preview URLs at the top
 of `web/index.html` to your address; the preview image is `web/icons/og.png`,
-rendered from `og.html` next to it. The local inbox isn't supported: a page
+rendered from `og.html` next to it. The deploy copies `docs/readme/flow.svg`
+into the page for the welcome; a copy without it hides the animation. The local
+inbox isn't supported: a page
 served over HTTPS can't call `http://<mac>.local`.
 
 ## Command line
