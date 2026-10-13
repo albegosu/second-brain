@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https:; img-src 'self' blob: data:; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#f3ede1">
+<meta name="theme-color" content="#f3ede1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1915" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="description" content="Share a link, a post or an image from Android or any browser. A vision model files it into your private wiki.">
 <title>Save to second-brain</title>
 <!-- Link previews. Absolute URLs, as crawlers need: change them if you host your own copy. -->
@@ -30,13 +32,27 @@
 <main>
   <header>
     <p class="brand">second-brain</p>
-    <h1 id="title">Save</h1>
+    <h1 id="title" tabindex="-1">Save</h1>
   </header>
 
   <aside class="install" id="install-banner" hidden>
     <p>Install this page to save from any app's Share menu.</p>
     <button type="button" class="secondary" id="install">Install</button>
   </aside>
+
+  <!-- A first visit: no settings yet, and the page wasn't opened to connect or to save something. -->
+  <section class="welcome" id="welcome" hidden>
+    <p class="lead">Share a link, a post or a screenshot from any app. A vision model files it into your private wiki. Then your coding agent builds with your DESIGN.md: your taste, drawn from what you saved.</p>
+    <!-- docs/readme/flow.svg, copied here when the page is deployed (.github/workflows/pages.yml). -->
+    <figure class="flow" id="flow">
+      <img id="flow-img" src="flow.svg" width="1280" height="720" loading="lazy" decoding="async" alt="The flow, animated: something shared from a phone is filed into a wiki, the wiki becomes a DESIGN.md, and a coding agent builds with it.">
+    </figure>
+    <div class="actions">
+      <a class="primary" href="https://github.com/albegosu/second-brain#quick-start">Set it up</a>
+      <button type="button" class="secondary" id="have-setup">I already ran bin/setup</button>
+    </div>
+    <p class="muted">Open source, and this page has no server: the settings stay in this browser and each capture goes straight to your own inbox.</p>
+  </section>
 
   <form id="capture" novalidate hidden>
     <section class="shared" id="shared" hidden>
@@ -65,8 +81,13 @@
     </label>
     <p class="muted" id="grow-hint" hidden>Without a note nothing is planted in hypar.</p>
 
-    <button type="submit" class="primary" id="send">Save to second-brain</button>
+    <button type="submit" class="primary" id="send" aria-busy="false"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="send-label">Save to second-brain</span></button>
     <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <div class="queue" id="queue" hidden>
+      <p><span id="queue-count" role="status" aria-live="polite"></span> <span class="muted">It's kept on this device and retried when you're back online or open this page again.</span></p>
+      <button type="button" class="secondary" id="retry" aria-busy="false">Retry now</button>
+    </div>
   </form>
 
   <form id="settings" novalidate hidden>
@@ -126,7 +147,6 @@
   </form>
 
   <footer id="footer" hidden>
-    <p id="queue" hidden><span id="queue-count"></span> <button type="button" class="link" id="retry">Retry now</button></p>
     <button type="button" class="link" id="toggle-settings">Settings</button>
   </footer>
 </main>

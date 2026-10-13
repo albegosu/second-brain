@@ -4,7 +4,7 @@ name: Capture page
 on:
   push:
     branches: [main]
-    paths: ["web/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "docs/readme/flow.svg", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -25,6 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # The welcome shows the README's animation: copied here, it's always the current one.
+      - name: Add the README's flow animation
+        run: cp docs/readme/flow.svg web/flow.svg
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

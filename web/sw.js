@@ -1,8 +1,11 @@
 // Service worker for the capture page: it receives Android shares (the
 // manifest's share_target POSTs to ./share) and keeps the page usable offline.
 // Requests to the Supabase inbox never pass through here: they're cross-origin.
-const SHELL = "second-brain-shell-v3";
+const SHELL = "second-brain-shell-v4";
 const SHARE = "second-brain-share";  // read and emptied by app.js
+// flow.svg (the welcome's animation) isn't listed: it's copied in at deploy time,
+// so a copy of web/ may not have it, and one missing file fails the install. The
+// fetch handler below caches it the first time the welcome shows it.
 const FILES = ["./", "style.css", "app.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
