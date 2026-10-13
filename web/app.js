@@ -5,6 +5,8 @@
 // inbox: a file in your GitHub inbox repository, or the Supabase inbox
 // (capture for links, capture_image for images). The settings and
 // any capture waiting to be sent stay in this browser; the page has no server.
+// A first visit, with no settings and nothing shared, opens on a short welcome
+// that says what second-brain is.
 "use strict";
 
 const INTENTS = ["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"];
@@ -18,6 +20,9 @@ const JPEG_QUALITY = 0.85;
 const MAX_BASE64 = 12000000;               // capture_image's limit
 const INBOX_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const ITEM_ERRORS = /invalid url|invalid image|unsupported image type/i;  // retrying won't help
+const HEADLINE = "Save what catches your eye. Build with it.";  // the welcome's title
+const SEND_LABEL = "Save to second-brain";
+const BROKEN_LINK = "That setup link didn't work: it may be cut short. Scan the QR code again, or paste the whole link.";
 
 const $ = (id) => document.getElementById(id);
 
@@ -293,15 +298,19 @@ function enqueue(item) {
   return save(QUEUE, [...queue(), { ...item, at: Date.now() }]);
 }
 
-async function flush() {
+// announce: say so when the queue empties (Retry now, or a capture that was
+// just kept on this device). Otherwise it empties quietly.
+async function flush(announce = false) {
   if (!settings || flushing || !queue().length) return renderQueue();
   flushing = true;
+  renderQueue();  // Retry now shows it's busy
   const waiting = queue();
   const left = [];
   let problem = "";
+  let sent = 0;
   for (let i = 0; i < waiting.length; i++) {
     const result = await send(waiting[i]);
-    if (result.ok) continue;
+    if (result.ok) { sent++; continue; }
     if (result.itemError) { problem = `One capture was dropped: ${result.message}`; continue; }
     problem = result.message;
     left.push(...waiting.slice(i));  // unreachable or wrong settings: keep the rest for later
@@ -310,6 +319,9 @@ async function flush() {
   save(QUEUE, left);
   flushing = false;
   renderQueue(problem);
+  if (left.length) return;
+  if (problem) status(problem, "error");  // a dropped capture, and nothing else waiting
+  else if (announce && sent) status(sent === 1 ? "Sent the capture that was waiting." : `Sent the ${sent} captures that were waiting.`, "ok");
 }
 
 function renderQueue(problem = "") {
@@ -318,31 +330,63 @@ function renderQueue(problem = "") {
   $("queue-count").textContent = n
     ? `${n} ${n === 1 ? "capture" : "captures"} waiting to send.${problem ? ` ${problem}` : ""}`
     : "";
+  $("retry").disabled = flushing;
+  $("retry").setAttribute("aria-busy", String(flushing));
+  $("retry").textContent = flushing ? "Sending…" : "Retry now";
 }
 
 // --- Screens -----------------------------------------------------------------
 
+// kind: "" (plain), "busy" (read out, shown on the button), "ok" or "error".
 function status(message, kind = "", target = "status") {
   const el = $(target);
+  el.className = "status";
   el.textContent = message;
-  el.className = `status${kind ? ` ${kind}` : ""}`;
+  if (!kind) return;
+  void el.offsetWidth;  // restart the notice's animation when the same kind shows again
+  el.classList.add(kind);
+}
+
+// The send button carries the busy state: label, or "" when it's done.
+function busy(label) {
+  const button = $("send");
+  button.disabled = Boolean(label);
+  button.setAttribute("aria-busy", String(Boolean(label)));
+  $("send-label").textContent = label || SEND_LABEL;
+  status(label, label ? "busy" : "");
+}
+
+// Three screens: welcome (a first visit), capture and settings (Connect, without settings).
+function show(screen) {
+  document.body.dataset.screen = screen;
+  for (const id of ["welcome", "capture", "settings"]) $(id).hidden = id !== screen;
+  $("footer").hidden = screen === "welcome";
+  renderInstall();
+}
+
+// After a button swapped the screen: start reading from its title.
+function focusTitle() {
+  window.scrollTo(0, 0);
+  $("title").focus({ preventScroll: true });
+}
+
+function showWelcome() {
+  show("welcome");
+  $("title").textContent = HEADLINE;
 }
 
 function showCapture() {
-  $("settings").hidden = true;
-  $("capture").hidden = false;
-  $("footer").hidden = false;
+  show("capture");
   $("title").textContent = "Save";
   $("toggle-settings").textContent = "Settings";
   renderQueue();
 }
 
 function showSettings() {
-  $("capture").hidden = true;
-  $("settings").hidden = false;
-  $("footer").hidden = !settings;
+  show("settings");
   $("title").textContent = settings ? "Settings" : "Connect";
-  $("toggle-settings").textContent = "Back";
+  // Without settings there's no capture form to go back to: the welcome says what this is.
+  $("toggle-settings").textContent = settings ? "Back" : "What is second-brain?";
   $("extras").hidden = !settings;
   const kind = settings ? settings.kind : "github";
   document.querySelector(`input[name="kind"][value="${kind}"]`).checked = true;
@@ -397,18 +441,23 @@ function resetCapture() {
 
 async function onCapture(event) {
   event.preventDefault();
+  if ($("send").disabled) return;  // already sending (Ctrl+Enter twice, for one)
   // Same format as the Shortcut: the worker reads the intent and the note from it.
   const note = `intent: ${intent()} — ${$("note").value.trim()}`;
   let item;
   if (image) {
-    status("Preparing the image…");
+    busy("Preparing the image…");
     try {
       const { blob, mime } = await toJpeg(image);
       item = { image: await toBase64(blob), mime, note };
     } catch (error) {
+      busy("");
       return status(error.message, "error");
     }
-    if (item.image.length > MAX_BASE64) return status("That image is too large for the inbox.", "error");
+    if (item.image.length > MAX_BASE64) {
+      busy("");
+      return status("That image is too large for the inbox.", "error");
+    }
   } else {
     const url = firstUrl($("url").value);
     if (!url) {
@@ -418,26 +467,28 @@ async function onCapture(event) {
     item = { url, note };
   }
 
-  $("send").disabled = true;
-  status("Sending…");
+  busy("Sending…");
   const result = await send(item);
-  $("send").disabled = false;
+  busy("");
 
   if (result.ok) {
-    finish("Sent to second-brain.");
+    finish();
   } else if (result.retry) {
-    if (enqueue(item)) finish(`${result.message} Kept on this device: it's sent when the inbox is back.`);
+    if (enqueue(item)) finish(result.message);
     else status(`${result.message} It couldn't be kept on this device either: try again.`, "error");
   } else {
     status(result.message, "error");
   }
 }
 
-function finish(message) {
-  status(message, "ok");
+// Sent, or kept on this device to send later (problem says why: the waiting
+// notice shows it, with Retry now).
+function finish(problem = "") {
   resetCapture();
-  renderQueue();
-  flush();
+  if (problem) status("");
+  else status("Sent to second-brain.", "ok");
+  renderQueue(problem);
+  flush(Boolean(problem));
   // Opened by the bookmarklet or from the share sheet: close and go back to where you were.
   if (window.name === POPUP || fromShare) setTimeout(() => window.close(), 900);
 }
@@ -495,13 +546,23 @@ function bind() {
     $("file").value = "";
   });
   $("drop-image").addEventListener("click", () => setImage(null));
-  $("toggle-settings").addEventListener("click", () => ($("settings").hidden ? showSettings() : showCapture()));
-  $("retry").addEventListener("click", () => flush());
+  $("have-setup").addEventListener("click", () => {
+    showSettings();
+    focusTitle();
+  });
+  $("toggle-settings").addEventListener("click", () => {
+    if ($("settings").hidden) showSettings();
+    else if (settings) showCapture();
+    else showWelcome();
+    focusTitle();
+  });
+  $("retry").addEventListener("click", () => flush(true));
   $("forget").addEventListener("click", () => {
     if (!confirm("Forget the settings on this device? Captures waiting to send are kept.")) return;
     settings = null;
     save(SETTINGS, null);
     showSettings();
+    focusTitle();
   });
   $("copy-link").addEventListener("click", async () => {
     try {
@@ -541,27 +602,58 @@ function bind() {
   });
 
   window.addEventListener("online", () => flush());
+  // A setup link opened in a tab already on this page only changes the fragment: no reload.
+  window.addEventListener("hashchange", () => {
+    if (!/^#setup=/.test(location.hash)) return;
+    const next = readSetupLink();
+    if (next) return applySettings(next);
+    showSettings();
+    status(BROKEN_LINK, "error", "s-status");
+  });
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     installPrompt = e;
-    $("install-banner").hidden = false;
+    renderInstall();
   });
-  window.addEventListener("appinstalled", () => ($("install-banner").hidden = true));
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    renderInstall();
+  });
   $("install").addEventListener("click", async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
     await installPrompt.userChoice;
     installPrompt = null;
-    $("install-banner").hidden = true;
+    renderInstall();
   });
+}
+
+// Not on the welcome: installing comes after knowing what this is.
+function renderInstall() {
+  $("install-banner").hidden = !installPrompt || document.body.dataset.screen === "welcome";
+}
+
+// The welcome's animation is docs/readme/flow.svg, copied next to the page when
+// it's deployed. Where it's missing (a local copy of web/), the figure goes away.
+function watchFlow() {
+  const img = $("flow-img");
+  const hide = () => ($("flow").hidden = true);
+  img.addEventListener("error", hide);
+  if (img.complete && !img.naturalWidth) hide();  // failed before this ran
+}
+
+function installed() {
+  return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
 
 async function start() {
   settings = normalize(load(SETTINGS, null));
   renderIntents();
   bind();
+  watchFlow();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
+  const setupHash = /^#setup=/.test(location.hash);
   const fromLink = readSetupLink();
   if (fromLink) {
     settings = fromLink;
@@ -571,7 +663,12 @@ async function start() {
 
   if (!settings) {
     applyShared(shared);  // kept in the form while you connect
-    showSettings();
+    // Opened to do something (a share, the bookmarklet, the installed app, a
+    // setup link that didn't parse): straight to Connect, as before. Anyone
+    // else arriving without settings gets the welcome first.
+    if (shared || fromShare || window.name === POPUP || setupHash || installed()) showSettings();
+    else showWelcome();
+    if (setupHash) status(BROKEN_LINK, "error", "s-status");
     return;
   }
   showCapture();

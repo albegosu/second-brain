@@ -10,3 +10,5 @@ __pycache__/
 venv/
 .env
 .DS_Store
+# copied from docs/readme/flow.svg when the capture page is deployed (.github/workflows/pages.yml)
+web/flow.svg

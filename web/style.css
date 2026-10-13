@@ -1,5 +1,11 @@
 /* Tokens from docs/examples/DESIGN.style-paper-ink.md, a DESIGN.md second-brain
-   generated: warm paper, black ink, one hot accent, square corners, no shadows. */
+   generated: warm paper, black ink, one hot accent, square corners, no shadows.
+
+   The dark theme is not in that DESIGN.md: its values are derived here. A warm
+   near-black ground, paper-colored text, the same hot accent and a lighter blue.
+   WCAG contrast, dark: on-surface 15.1:1 on neutral and 13.4:1 on surface,
+   secondary 6.1:1 and 5.4:1, on-primary 4.9:1 on primary, on-tertiary 8.1:1 on
+   tertiary, and the focus outline (tertiary) 8.1:1 on neutral and 7.2:1 on surface. */
 :root {
   --primary: #d9481f;
   --on-primary: #000000;
@@ -12,7 +18,19 @@
   --outline: #cdc8bd;
   --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
   --sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --secondary: #9f978a;
+    --tertiary: #8fb3dc;
+    --on-tertiary: #1b1915;
+    --neutral: #1b1915;
+    --surface: #26231e;
+    --on-surface: #f3ede1;
+    --outline: #433e36;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -41,6 +59,7 @@ header { margin-bottom: 40px; }
   color: var(--secondary);
 }
 h1 { margin: 0; font: 500 32px/1.2 var(--serif); letter-spacing: -0.01em; }
+h1:focus { outline: none; }  /* focused only to move a screen reader to the new screen */
 h2 { margin: 40px 0 12px; }
 p { margin: 0; }
 code { font: 0.9em ui-monospace, Menlo, Consolas, monospace; }
@@ -64,25 +83,48 @@ input[type="url"], input[type="text"], input[type="password"], textarea {
 textarea { resize: vertical; }
 ::placeholder { color: var(--secondary); opacity: 1; }
 
+/* --- Choices: what caught your eye, and the kind of inbox ------------------- */
+
 fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 legend { padding: 0; margin-bottom: 12px; }
 .options { display: flex; flex-wrap: wrap; gap: 8px; }
-.options label { cursor: pointer; }
+.options label { display: flex; cursor: pointer; }
 .options input { position: absolute; opacity: 0; pointer-events: none; }
 .options span {
-  display: inline-block;
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;  /* a thumb-sized target */
+  padding: 10px 16px;
   border: 1px solid var(--outline);
   background: var(--surface);
   font: 500 14px/1.2 var(--sans);
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
 }
+.options label:hover span { border-color: var(--secondary); }
 .options input:checked + span { background: var(--tertiary); border-color: var(--tertiary); color: var(--on-tertiary); }
+/* Six intents in an even grid: two columns on a phone, three on a wider screen. */
+#intents { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+
+/* --- Buttons and links ------------------------------------------------------ */
 
 button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01em; cursor: pointer; }
-.primary, .secondary { min-height: 48px; padding: 0 24px; }
+.primary, .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 24px;
+  font: 500 14px/1.2 var(--sans);
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
 .primary { border: 0; background: var(--primary); color: var(--on-primary); }
 .primary:disabled { opacity: 0.6; cursor: progress; }
 .secondary { border: 1px solid var(--outline); background: var(--surface); color: var(--on-surface); justify-self: start; }
+.secondary:hover { border-color: var(--secondary); }
+.secondary:disabled { cursor: progress; }
 .link {
   padding: 0;
   border: 0;
@@ -106,6 +148,26 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
 
 :focus-visible, .options input:focus-visible + span { outline: 2px solid var(--tertiary); outline-offset: 2px; }
 
+/* Sending: the button stays solid and three squares pulse in turn. */
+.primary[aria-busy="true"] { opacity: 1; }
+.dots { display: none; gap: 4px; }
+[aria-busy="true"] > .dots { display: inline-flex; }
+.dots i { width: 6px; height: 6px; background: currentColor; animation: pulse 900ms ease-in-out infinite; }
+.dots i:nth-child(2) { animation-delay: 150ms; }
+.dots i:nth-child(3) { animation-delay: 300ms; }
+@keyframes pulse { 0%, 70%, 100% { opacity: 0.25; } 35% { opacity: 1; } }
+
+/* --- Welcome ---------------------------------------------------------------- */
+
+[data-screen="welcome"] h1 { font-size: clamp(32px, 7.5vw, 44px); line-height: 1.1; }
+.welcome { display: grid; gap: 32px; }
+.lead { font: 400 18px/1.6 var(--serif); }
+.flow { margin: 0; border: 1px solid var(--outline); background: var(--surface); }
+.flow img { display: block; width: 100%; height: auto; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* --- What was shared, the install banner ------------------------------------ */
+
 .shared { display: grid; gap: 12px; padding: 24px; border: 1px solid var(--outline); background: var(--surface); }
 .shared img { display: block; max-width: 100%; max-height: 50vh; margin: 0 auto; }
 .shared .link { justify-self: start; font: 500 14px/1.2 var(--sans); }
@@ -127,10 +189,87 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
 #extras h2 { margin: 28px 0 0; }
 #extras h2:first-child { margin-top: 0; }
 #extras > p:last-child { margin-top: 28px; }
+
+/* --- Status: sent, waiting to send, error ----------------------------------- */
+
 .status { font: 500 14px/1.4 var(--sans); }
 .status:empty { display: none; }
-.status.ok::before { content: "✓ "; }
-.status.error::before { content: "✗ "; }
+/* Sending and preparing are shown on the button; the line still tells a screen reader. */
+.status.busy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* A notice: a mark in a 20px square, then the message. */
+.status.ok, .status.error, .queue {
+  position: relative;
+  padding: 12px 16px 12px 48px;
+  border: 1px solid var(--outline);
+  background: var(--surface);
+  color: var(--on-surface);
+  animation: notice-in 200ms ease-out;
+}
+.status.ok::before, .status.error::before, .queue::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  width: 20px;
+  height: 20px;
+}
+/* Sent: a check drawn in the second accent, short stroke then long. */
+.status.ok::before { background: var(--tertiary); }
+.status.ok::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 23px;
+  width: 6px;
+  height: 11px;
+  border: solid var(--on-tertiary);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  animation: draw 320ms ease-out 80ms both;
+}
+/* Error: an exclamation mark on the hot accent. */
+.status.error::before {
+  content: "!";
+  content: "!" / "";
+  background: var(--primary);
+  color: var(--on-primary);
+  font: 700 14px/20px var(--sans);
+  text-align: center;
+}
+/* Waiting to send: a clock, and a way to retry. */
+.queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding-right: 12px;
+  font: 500 14px/1.4 var(--sans);
+}
+.queue p { flex: 1 1 14rem; }
+.queue .muted { font-weight: 400; }
+.queue .secondary { background: var(--neutral); }
+.queue::before { border: 2px solid var(--secondary); border-radius: 50%; }
+.queue::after {
+  content: "";
+  position: absolute;
+  top: 17px;
+  left: 25px;
+  width: 5px;
+  height: 6px;
+  border: solid var(--secondary);
+  border-width: 0 0 2px 2px;
+}
+
+@keyframes notice-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes draw {
+  from { clip-path: inset(100% 100% 0 0); }
+  40% { clip-path: inset(calc(100% - 2px) 0 0 0); }
+  to { clip-path: inset(0); }
+}
+
+/* --- Footer, dropping an image ---------------------------------------------- */
 
 footer {
   display: flex;
@@ -146,3 +285,15 @@ footer {
 footer .link { color: var(--secondary); }
 
 body.dragging main { outline: 2px dashed var(--tertiary); outline-offset: -12px; }
+
+/* --- Small screens, reduced motion ------------------------------------------ */
+
+@media (max-width: 30rem) {
+  .actions > * { flex: 1 1 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation: none !important; transition: none !important; }
+  .dots i:nth-child(2) { opacity: 0.6; }
+  .dots i:nth-child(3) { opacity: 0.3; }
+}
