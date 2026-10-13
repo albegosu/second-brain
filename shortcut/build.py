@@ -11,7 +11,7 @@ Shortcuts only imports signed files and only macOS can sign them (`shortcuts
 sign`). The file stores nothing personal: on import, Shortcuts asks for the
 Supabase project URL, the publishable key and the capture token.
 
-The workflow is the one the README describes: share a link, text or an image;
+The workflow is the one docs/capture.md describes: share a link, text or an image;
 if an image was shared it's converted to JPEG and base64-encoded and POSTed to
 capture_image(), otherwise the first URL goes to capture(); either way it asks
 for an optional note and shows whether the inbox queued it.

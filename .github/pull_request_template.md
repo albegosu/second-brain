@@ -11,5 +11,5 @@ a before/after excerpt of a generated page. -->
 
 - [ ] Tested on a throwaway wiki (`BRAIN_WIKI=<copy> BRAIN_GIT_SYNC=0`), not a real one
 - [ ] No captured content, tokens, Supabase refs, ntfy topics or `.env` files in the diff
-- [ ] Everything in English; README and ROADMAP updated if behavior, settings or plans changed
+- [ ] Everything in English; README or docs/ and ROADMAP updated if behavior, settings or plans changed
 - [ ] Title follows Conventional Commits (`feat(capture): …`, `fix(lint): …`)

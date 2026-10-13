@@ -15,5 +15,5 @@ some fetched with logged-in sessions, and name their authors. The workflows run
 here too because GitHub Actions logs of a public repository are public, and they
 print what was captured.
 
-Setup (deploy key, secrets, Supabase): the engine's README, section *Worker on
-GitHub Actions*.
+Setup (deploy key, secrets, Supabase): the engine's `docs/self-hosting.md`,
+section *Worker on GitHub Actions*.
