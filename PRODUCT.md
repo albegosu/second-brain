@@ -33,13 +33,16 @@ shape what their AI assistant builds instead of rotting in a bookmarks folder.
 
 In a survey of comparable products in September 2026 (save-anything apps,
 short-video organizers, AI bookmark managers, design reference libraries and
-agent memory tools), none of them did the following. This is the product.
+agent memory tools), none of them did the following. In November 2026, marked
+was the first to share the premise of points 4 and 5, your own saves read by a
+coding agent; it does none of the rest. This is the product.
 
 1. **It understands interface video visually.** Frames are sampled across the
    whole video and a vision model describes each interaction as a trigger,
    numbered behavior steps, animated properties and easing. Short-video
    organizers index what is *said* (captions, transcripts); save-anything apps
-   tag what an image *contains*. None of them capture how an interface *moves*.
+   tag what an image *contains*; reference libraries play the video for you but
+   hand the agent a still. None of them capture how an interface *moves*.
 2. **It measures instead of guessing.** The palette comes from pixels, with
    neutrals and brand accents kept apart. Facets and style traits come from a
    closed vocabulary. Durations and cubic-bezier curves are deliberately left out,
@@ -47,10 +50,12 @@ agent memory tools), none of them did the following. This is the product.
 3. **The output is a wiki you own, in git.** Topic pages synthesize several
    captures with inline citations, and every capture keeps a verbatim source note.
    Other products keep your saves in a proprietary library as cards and tags.
-4. **It is built to be consumed by a coding agent.** The index, topic pages and
-   source notes are laid out for an agent to navigate in one context window, and a
-   skill tells it how. The goal is references that change what gets built, not a
-   library to reread.
+4. **It is built to be consumed by a coding agent, already synthesized.** The
+   index, topic pages and source notes are laid out for an agent to navigate in
+   one context window, and a skill tells it how. Libraries that serve your saves
+   over MCP hand the agent one reference at a time and leave it to work out what
+   they share on every task; here that synthesis is done once, kept and cited.
+   The goal is references that change what gets built, not a library to reread.
 5. **Your own references, not a curated catalog.** Mobbin and Refero give agents
    excellent references chosen by someone else. second-brain gives them what *you*
    found worth keeping, with your notes.
@@ -93,6 +98,7 @@ agent memory tools), none of them did the following. This is the product.
 
 | Product | Overlap | What it lacks here |
 |---|---|---|
+| marked | Your own UI and motion refs from X, Pinterest and the web, in collections, credited, served to Claude Code, Codex and Cursor over a remote MCP | The agent gets a still and a link, not the motion; refs one by one, no synthesis or DESIGN.md; design only; 100 free agent searches a month |
 | mymind | Save anything with AI tagging; image recognition; API and MCP | Tags instead of a synthesized wiki; no motion analysis; paid |
 | Fabric | Saves and transcribes TikToks and Reels; MCP | Understands speech, not the interface on screen |
 | ReelRecall, Recollect AI, Squil, Ordo | Organize saved short videos | Transcript search; little or no agent access |
