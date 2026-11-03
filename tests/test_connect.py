@@ -190,10 +190,8 @@ class Connect(unittest.TestCase):
         mcp_agent, skill = self.agent("cursor"), self.agent("claude-code")
         with mock.patch.object(c, "env_wiki", return_value=None), mock.patch.object(c, "ENGINE", self.home):
             self.assertEqual(len(c.notes([mcp_agent])), 2)  # no virtualenv, no BRAIN_WIKI
-        with mock.patch.object(c, "env_wiki", return_value=self.home / "wiki"):
-            self.assertTrue(any("skill looks in" in n for n in c.notes([skill])))
-        with mock.patch.object(c, "env_wiki", return_value=c.DEFAULT_WIKI):
-            self.assertEqual(c.notes([skill]), [])
+        with mock.patch.object(c, "env_wiki", return_value=None), mock.patch.object(c, "ENGINE", self.home):
+            self.assertEqual(c.notes([skill]), [])  # the skill reads the wiki without either
 
     def test_env_wiki_reads_the_env_file(self):
         env = self.home / ".env"

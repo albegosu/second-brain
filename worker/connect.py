@@ -39,7 +39,6 @@ NAME = "second-brain"
 ENGINE = Path(__file__).resolve().parent.parent
 SKILL = ENGINE / "skill" / NAME
 SERVER = ENGINE / "bin" / "second-brain-mcp"
-DEFAULT_WIKI = Path.home() / "Developer" / "second-brain-wiki" / "wiki"  # where the skill looks without BRAIN_WIKI
 
 CONNECTED, STALE, MISSING, ABSENT, LOCKED = "connected", "stale", "not connected", "not installed", "left alone"
 
@@ -293,15 +292,13 @@ def env_wiki(env_file: Path = ENGINE / ".env") -> Path | None:
 
 def notes(done: list[Agent]) -> list[str]:
     """What still stands between the agents just connected and the wiki."""
-    out, wiki = [], env_wiki()
+    out = []
     if any(a.kind != "skill" for a in done):
         if not (ENGINE / ".venv" / "bin" / "python").exists():
             out.append("the MCP server runs in the engine's virtualenv, which isn't there yet: "
                        "see docs/self-hosting.md#install-the-worker-locally")
-        if wiki is None:
+        if env_wiki() is None:
             out.append(f"the MCP server reads the wiki from BRAIN_WIKI in {short(ENGINE / '.env')}, which isn't set")
-    if any(a.kind == "skill" for a in done) and wiki and wiki.resolve() != DEFAULT_WIKI.resolve():
-        out.append(f"the skill looks in {short(DEFAULT_WIKI)} unless BRAIN_WIKI is set where your agent runs")
     return out
 
 

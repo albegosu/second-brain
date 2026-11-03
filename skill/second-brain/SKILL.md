@@ -5,9 +5,17 @@ description: The user's personal knowledge base, kept as a Markdown wiki of thin
 
 # Second brain
 
-The wiki is the `wiki/` folder of the user's private wiki repository: `$BRAIN_WIKI` if set, `~/Developer/second-brain-wiki/wiki/` by default. The paths below use the default. A model writes it from captures, so treat it as references and ideas, not as specs.
+The wiki is the `wiki/` folder of the user's private wiki repository. A model writes it from captures, so treat it as references and ideas, not as specs.
 
-A worker in GitHub Actions writes it and the computer pulls it periodically. If the very latest captures matter, pull first:
+The engine is the repository this skill belongs to, wherever it was cloned: `~/.claude/skills/second-brain/../..` reaches it through the skill's link (from this skill's base directory, if it's installed elsewhere). Its `.env` says where the wiki is; look once per session:
+
+```bash
+grep '^BRAIN_WIKI=' ~/.claude/skills/second-brain/../../.env
+```
+
+Without that line, the wiki is `~/Developer/second-brain-wiki/wiki/`. The paths below use that default: put the real one in their place. The engine's commands below run through its `bin/worker`, which loads that `.env` itself.
+
+A worker in GitHub Actions writes the wiki and the computer pulls it periodically. If the very latest captures matter, pull its repository (the folder above `wiki/`) first:
 
 ```bash
 git -C ~/Developer/second-brain-wiki pull --ff-only -q
@@ -37,13 +45,13 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 - Designing something with no style given, neither by the user nor by the project's design system? Start from `wiki/DESIGN.md` (the weekly lint pass writes it; until then, `wiki/taste.md`). When the captures split between light and dark backgrounds there is also `wiki/DESIGN.dark.md` (or `DESIGN.light.md`): same type, shapes and spacing, colors measured on the other tone. Use the one matching the project's background, or both for a light and a dark mode. `DESIGN.md` is the same taste as `wiki/taste.md`, written as a [DESIGN.md](https://github.com/google-labs-code/design.md) (color roles, type scale, radius, spacing and components as tokens, then rules). Follow its tokens rather than inventing values; code derived them from measured palettes and already checked text contrast (4.5:1). `wiki/taste.md` has the counts behind them; treat anything marked "no clear lead" or "Not enough evidence" as a question to ask. An explicit request or the project's own tokens always win over both.
 - Building with a saved style ("hazlo con el estilo X", or a `style-*` topic fits the task)? Generate that topic's DESIGN.md and build from it, then look at the topic's frames: the tokens set colors and scales, the image shows the composition.
   ```bash
-  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.design_md --style <slug> --out <project>/DESIGN.md
+  ~/.claude/skills/second-brain/../../bin/worker design_md --style <slug> --out <project>/DESIGN.md
   ```
   The slug is the topic's file name (`style-editorial`, or just `editorial`); without `--out` it prints. A topic with several looks (one `### Name [n]` block each) gives its dominant one and names the others; add `--look "<name>"` to build from another. A model writes only the overview and rules; `--no-model` skips it (a template writes them) when Ollama isn't reachable. The file carries capture numbers for the usage log but no links or post text; it is still derived from private captures, so ask before committing it to a public repository, and never overwrite a DESIGN.md the project already has.
 - Deciding how to approach engineering or agent work (structuring a task, testing, reviewing, setting up an agent or its tools)? Read `wiki/AGENTS.md` if it exists: the user's practices as rules. Its **Rules** have evidence behind them (two or more captures, or a use in a build): follow them unless the user or the project says otherwise. **Worth trying** are suggestions from a single capture: use them when they fit. The project's own AGENTS.md, CLAUDE.md or instructions always win. Each line ends with its capture numbers, for the usage log below.
   To put it in a project, write it next to the project's files rather than over them, and never overwrite an AGENTS.md the project already has:
   ```bash
-  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.agents_md --out <project>/AGENTS.md
+  ~/.claude/skills/second-brain/../../bin/worker agents_md --out <project>/AGENTS.md
   ```
   It is derived from private captures (capture numbers, no links or post text), so ask before committing it to a public repository.
 - Before adding a dependency (a library, a CLI, a service), check `wiki/stack.md` if it exists: the user's saved tools by the job they do. If one does the job, say so and prefer it: first one **used** in a build, then one saved **to try**. Don't pick a **stale** one (archived, gone or no commit in a year) unless nothing else fits, and say why. The project's existing stack and the user's choice always win. Record a tool you adopt in the usage log by its capture numbers.
@@ -52,20 +60,20 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 - Adapt to the project's own design tokens and stack. The only code the wiki holds is what a source showed (a README's install line, a config from a post), copied verbatim: check a command against the tool's current docs before running it.
 - When something you built actually takes from captures, record it once, at the end, with their capture numbers (the `0007` in `sources/2026-09/0007-….md`). It shows the user which saves turn out useful. A save you only read or looked at is not logged, even if it informed your thinking.
   ```bash
-  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.used 7 21 --project "<repository or product>" --what "<what was taken, in one line>" --ref "<commit or pull request URL>"
+  BRAIN_GIT_SYNC=1 ~/.claude/skills/second-brain/../../bin/worker used 7 21 --project "<repository or product>" --what "<what was taken, in one line>" --ref "<commit or pull request URL>"
   ```
   - Whenever the work lands as a commit or a pull request, pass its URL as `--ref`, so the credit can be checked by opening the diff; the index counts those uses as verifiable. Record after pushing, once the URL exists. Leave `--ref` out only when nothing was committed.
   - In a private repository you may also list the captures a change takes from (numbers and topic names) in its PR description. Never in a public repository: they come from the user's private wiki.
 
 ## Adding to it
 
-Captures usually arrive through the share shortcut on iPhone or Mac, and GitHub Actions processes them. To file one from a session (needs the repo's `.env` and Ollama reachable):
+Captures usually arrive through the share shortcut on iPhone or Mac, and GitHub Actions processes them. To file one from a session (the model provider has to be reachable with the settings in the engine's `.env`):
 
 ```bash
-cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.run --url "<url>" --note "<why it matters>"
+BRAIN_GIT_SYNC=1 ~/.claude/skills/second-brain/../../bin/worker run --url "<url>" --note "<why it matters>"
 ```
 
 - Put `style: <name>` in the note to file the capture under the design topic `style-<name>`.
 - Topic pages are rewritten from their source notes whenever a capture arrives or the weekly lint pass reorganizes topics, so manual edits to a topic page don't last. Put lasting context in the capture's note instead.
 - `wiki/index.md`, `wiki/taste.md`, `wiki/DESIGN.md` and `wiki/usage.md` are written by code, so never edit them by hand.
-- Don't commit wiki changes: the worker commits and pushes them to the wiki repository. Engine code changes (`~/Developer/second-brain` by default) are the user's to commit.
+- Don't commit wiki changes: the worker commits and pushes them to the wiki repository. Engine code changes (in the engine's folder) are the user's to commit.
