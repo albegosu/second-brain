@@ -42,7 +42,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
   The slug is the topic's file name (`style-editorial`, or just `editorial`); without `--out` it prints. A topic with several looks (one `### Name [n]` block each) gives its dominant one and names the others; add `--look "<name>"` to build from another. A model writes only the overview and rules; `--no-model` skips it (a template writes them) when Ollama isn't reachable. The file carries capture numbers for the usage log but no links or post text; it is still derived from private captures, so ask before committing it to a public repository, and never overwrite a DESIGN.md the project already has.
 - Building for one of the user's collections ("build from my checkout collection", "hazlo con mi colección acme")? A collection is the user's own grouping by what they saved captures for (a project, a client, a redesign); the index's **Collections** section lists each one with its captures, which are also filed in their topics. Read those captures' source notes and frames, not the whole topics they sit in. For the look, generate the collection's DESIGN.md: the taste's method over only its design and features captures, so nothing from outside the collection gets in.
   ```bash
-  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.design_md --collection <name> --out <project>/DESIGN.md
+  ~/.claude/skills/second-brain/../../bin/worker design_md --collection <name> --out <project>/DESIGN.md
   ```
   The same cautions as a style's DESIGN.md apply: ask before committing it to a public repository, and never overwrite one the project already has.
 - Deciding how to approach engineering or agent work (structuring a task, testing, reviewing, setting up an agent or its tools)? Read `wiki/AGENTS.md` if it exists: the user's practices as rules. Its **Rules** have evidence behind them (two or more captures, or a use in a build): follow them unless the user or the project says otherwise. **Worth trying** are suggestions from a single capture: use them when they fit. The project's own AGENTS.md, CLAUDE.md or instructions always win. Each line ends with its capture numbers, for the usage log below.
@@ -73,7 +73,7 @@ cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRA
 - Put `style: <name>` in the note to file the capture under the design topic `style-<name>`.
 - Put `collection: <name>` (or `colección: <name>`) in the note to add the capture to one of the user's collections, a project or client of theirs in kebab-case. It stays in the topic the model picks; repeat the keyword for several collections. To add captures that are already filed, without analyzing them again (`--remove` takes them out):
   ```bash
-  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.collect 7 21 <name>
+  BRAIN_GIT_SYNC=1 ~/.claude/skills/second-brain/../../bin/worker collect 7 21 <name>
   ```
 - Topic pages are rewritten from their source notes whenever a capture arrives or the weekly lint pass reorganizes topics, so manual edits to a topic page don't last. Put lasting context in the capture's note instead.
 - `wiki/index.md`, `wiki/taste.md`, `wiki/DESIGN.md` and `wiki/usage.md` are written by code, so never edit them by hand.
