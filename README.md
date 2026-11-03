@@ -88,17 +88,19 @@ supports, any other page, images and the speech in videos:
 
 ## Use it from your agent
 
-Claude reads the wiki through the `second-brain` skill before it designs or
-builds something, and logs what it used. Link it where Claude reads skills
-(`bin/setup` offers to):
+Claude Code reads the wiki through the `second-brain` skill before it designs or
+builds something, and logs what it used. Cursor, Codex, Claude Desktop,
+Windsurf, VS Code and Gemini CLI read it over MCP, through a
+[read-only server on stdio](docs/integrations.md#other-agents-mcp). One command
+connects every agent it finds on your computer (`bin/setup` runs it for you):
 
 ```bash
-ln -s ~/Developer/second-brain/skill/second-brain ~/.claude/skills/second-brain
+bin/connect
 ```
 
-Clients that don't load skills (Claude Desktop, Cursor, Windsurf, Zed…) can read
-it over MCP with `bin/second-brain-mcp`, a
-[read-only server on stdio](docs/integrations.md#other-agents-mcp).
+`bin/connect --status` shows which ones are connected, `--remove <agent>`
+disconnects one, and `bin/connect other` prints the snippet for any other MCP
+client.
 
 ## Run it your way
 

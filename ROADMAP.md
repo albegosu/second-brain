@@ -169,6 +169,14 @@ projects are developed apart; only what the bridge needs is synchronized, in the
   frames as images and DESIGN.md, for clients that don't load skills (Claude
   Desktop, Cursor). Still open: ChatGPT, which needs a remote server.
   *Inspired by ContextBolt, Karakeep and the Readwise MCP.*
+- ~~**Every agent in one command.**~~ Done: `bin/connect` finds the agents on
+  the computer and connects each one: the skill for Claude Code, the MCP server
+  in the config file of Cursor, Codex, Claude Desktop, Windsurf, VS Code and
+  Gemini CLI. It lists which are connected, updates paths left by a moved
+  engine, disconnects one on request and prints the snippet for any other
+  client; `bin/setup` runs it.
+  [#81](https://github.com/albegosu/second-brain/issues/81)
+  *Inspired by marked's Settings → Agents.*
 - **Semantic search, only if needed.** At personal scale the index plus the
   context window is enough; add embeddings only when the index stops fitting.
   *Karpathy's LLM wiki pattern.*
