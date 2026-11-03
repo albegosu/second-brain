@@ -18,7 +18,7 @@ skill starts from it when nothing else sets a style. `python -m worker.taste
 Collections like getdesign.md give an agent a brand's
 [DESIGN.md](https://github.com/google-labs-code/design.md) (Stripe's, Linear's);
 this one is yours. After the lint pass, `wiki/DESIGN.md` holds the taste in that
-format, and any style topic gets its own on demand. The code derives every token:
+format, and any style topic or collection gets its own on demand. The code derives every token:
 measured palettes become color roles (primary, secondary, tertiary, neutral,
 surface, on-surface, outline), with text colors darkened or lightened along their
 own hue until they reach 4.5:1; the type family category becomes an open font
@@ -37,6 +37,13 @@ writes them. The file holds capture numbers but no links or post text.
   `--look "<name>"` gives any other: each trait takes the value most of the
   look's captures share, and the colors come from the single capture that
   matches best, so palettes are never mixed.
+- **Collections.** `--collection <name>` writes the DESIGN.md of one of your
+  [collections](wiki.md#collections): the taste's method (counts, leads, the
+  most typical page color and accent) over only the captures in it, so nothing
+  you saved for something else gets in. It counts the collection's design and
+  features captures, the interfaces in it: a tool's landing page or an
+  article's screenshot wasn't saved for its look. One capture with a look is
+  enough, and what the captures don't settle is said so, as in the taste.
 - **A primary that may be a photo's.** Palettes are measured from pixels, so
   they include content colors. Accents are ranked vivid first, then clear, then
   muted or dark. When no accent is vivid, or the words the wiki uses for the look
@@ -48,6 +55,7 @@ python -m worker.design_md                                      # rewrite wiki/D
 python -m worker.design_md --tone dark                          # print the taste's dark twin
 python -m worker.design_md --style editorial --out app/DESIGN.md  # one style topic
 python -m worker.design_md --style editorial --look "Night Edition"  # one of its looks
+python -m worker.design_md --collection checkout --out app/DESIGN.md  # only a collection's captures
 python -m worker.design_md --style editorial --dry-run          # print tokens and contrast, change nothing
 python -m worker.design_md --no-model                           # template prose, no model call
 ```

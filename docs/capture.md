@@ -74,7 +74,8 @@ hash so the same image isn't saved twice.
 The note is worth it: it goes into the prompt and improves the analysis a lot,
 because you know what caught your eye and the model doesn't. A note can also
 start with `intent: Tool to try —` (or any of the menu's intents) when you build
-the Shortcut by hand.
+the Shortcut by hand, and carry [keywords](#keywords-in-the-note) that sort the
+capture.
 
 ### Build it by hand
 
@@ -154,6 +155,24 @@ rendered from `og.html` next to it. The deploy copies `docs/readme/flow.svg`
 into the page for the welcome; a copy without it hides the animation. The local
 inbox isn't supported: a page
 served over HTTPS can't call `http://<mac>.local`.
+
+## Keywords in the note
+
+Two keywords in a note sort the capture instead of describing it. They work the
+same from the Shortcut, the capture page and `--note`, so neither needs anything
+new:
+
+- `style: <name>` (or `estilo: <name>`) files it under the design topic
+  `style-<name>`, to collect a look across several captures.
+- `collection: <name>` (or `colección: <name>`) adds it to a
+  [collection](wiki.md#collections) of yours: what you saved it for, such as a
+  project, a client or a redesign. It stays in the topic the model picks, and
+  you can repeat the keyword for several collections (`collection: checkout
+  collection: acme`). The model never reads it, so your project's name can't
+  pull the capture into a topic of its own.
+
+Names are kebab-case (`acme-web`). Share a link you already saved with a
+`collection:` note and it joins the collection without being analyzed again.
 
 ## Command line
 

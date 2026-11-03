@@ -12,7 +12,7 @@ and turns your taste into a DESIGN.md your coding agent builds from.**
 - **Curated, not dumped.** A vision model reads the frames, measures the palette
   from pixels and files each capture under a topic: design, features, tools or
   practices. Code counts your recurring choices into a taste profile.
-- **Your DESIGN.md.** The taste, or any saved style, becomes a
+- **Your DESIGN.md.** The taste, any saved style or a collection of yours becomes a
   [DESIGN.md](https://github.com/google-labs-code/design.md): tokens derived by
   code, contrast-checked, lint-clean. getdesign.md gives you Stripe's DESIGN.md;
   second-brain gives you yours.
@@ -30,7 +30,7 @@ by your agent.
 |---|---|
 | [The wiki](docs/wiki.md) | One page per topic, one source note per capture (with up to four frames of what it looked like) and an index, kept tidy by a weekly lint pass |
 | [`taste.md`](docs/outputs.md#taste-profile) | Your recurring choices across captures, as a default look and motion |
-| [`DESIGN.md`](docs/outputs.md#designmd) | The taste as design tokens, with a dark (or light) twin when your captures split; any style topic gets its own |
+| [`DESIGN.md`](docs/outputs.md#designmd) | The taste as design tokens, with a dark (or light) twin when your captures split; any style topic or collection gets its own |
 | [`AGENTS.md`](docs/outputs.md#agentsmd) | The ideas of your `practices` topics as rules a coding agent follows |
 | [`stack.md`](docs/outputs.md#stackmd) | The tools you saved, by job: used, to try or stale |
 | [`usage.md`](docs/outputs.md#usage-log) | What was built from which captures, so what proves useful stands out |
