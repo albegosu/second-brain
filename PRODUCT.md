@@ -90,7 +90,9 @@ coding agent; it does none of the rest. This is the product.
 ## Non-goals
 
 - A public inspiration gallery or a social product.
-- A custom browsing UI: GitHub and any Markdown editor already render the wiki.
+- A hosted browsing app. Browsing stays on your computer: GitHub and any
+  Markdown editor render the wiki, and a gallery generated from it is planned
+  ([roadmap](ROADMAP.md#wiki-organized-for-an-agent-to-use)).
 - Replacing curated reference libraries: they complement your own saves.
 - Pixel-perfect reproduction of what was captured.
 

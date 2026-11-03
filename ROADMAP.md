@@ -102,6 +102,14 @@ is rough priority.
   are the model's organization; what you saved something *for* is yours, and no
   model can infer it. [#78](https://github.com/albegosu/second-brain/issues/78)
   *Inspired by marked's collections.*
+- **A gallery to browse, on your computer.** `bin/worker gallery` writes one
+  static HTML page from the wiki and opens it: a card per capture with its
+  frames, title, author, topic and collections, filtered by category,
+  collection and facet. Code writes it, like the index, and it's never hosted,
+  because the wiki quotes other people's posts. GitHub renders the text; this
+  shows the references side by side.
+  [#86](https://github.com/albegosu/second-brain/issues/86)
+  *Inspired by marked's grid.*
 - **Answers filed back.** When Claude answers a question from the wiki, let it
   save the synthesis as a page, so exploration compounds instead of evaporating.
   *Inspired by Karpathy's LLM wiki pattern.*
