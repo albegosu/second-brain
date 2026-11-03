@@ -13,7 +13,9 @@ machine that can reach Ollama:
 
 It keeps no state of its own: a capture is filed if a source note with its URL
 exists in wiki/sources, and the next capture number comes from the existing notes.
-"style: name" (or "estilo: name") in the note files it under design/style-<name>.
+"style: name" (or "estilo: name") in the note files it under design/style-<name>;
+"collection: name" (or "colección: name") adds it to that collection of yours,
+without moving it from its topic.
 Shared as "Idea to grow", the note is also planted as an embryo in hypar.
 """
 import argparse
@@ -76,14 +78,21 @@ TRANSIENT = re.compile(r"\b(408|425|429|50[0-4])\b|timed? ?out|No route to host|
 def parse_note(note: str | None) -> tuple[str | None, str | None, str | None]:
     """What a note says besides free text: "style: name" picks the topic and
     "intent: …" (the Shortcut's menu) hints the category. The rest goes to the
-    model as the user's note."""
+    model as the user's note, without its "collection: name" keywords: what a
+    capture was saved for says nothing about what it shows (collections_in)."""
     style = intent = None
-    rest = note or ""
+    rest = wiki.COLLECTION_TAG.sub("", note or "")
     if m := STYLE_TAG.search(rest):
         style, rest = m.group(1).lower(), rest[:m.start()] + rest[m.end():]
     if m := INTENT_TAG.search(rest):
         intent, rest = m.group(1).lower(), rest[:m.start()] + rest[m.end():]
     return style, intent, rest.strip(" \n,;.—–-") or None
+
+
+def collections_in(note: str | None) -> list[str]:
+    """The collections a note adds its capture to: every "collection: name" (or
+    "colección: name"), so one capture can join several."""
+    return sorted({wiki.slugify(m) for m in wiki.COLLECTION_TAG.findall(note or "")})
 
 
 def is_transient(e: Exception) -> bool:
@@ -116,10 +125,26 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
     if existing and note is None:
         note = existing[1].get("note")  # re-analysis without --note keeps the note
     style, intent, vlm_note = parse_note(note)
+    # The note's frontmatter is what a filed capture's collections are, so one
+    # taken out of a collection stays out when its old note is analyzed again.
+    # Only a new note's keywords add to them.
+    collections = wiki.note_collections(existing[1]) if existing else []
+    if not existing or note != existing[1].get("note"):
+        collections = sorted({*collections, *collections_in(note)})
 
-    # Already filed: nothing to do, unless the note carries a style.
+    # Already filed: nothing to do, unless the note carries a style or new collections.
     if existing and not reanalyze and not style:
-        return {"text": f"already filed: #{existing[0]}", "already": True}
+        new = [c for c in collections if c not in wiki.note_collections(existing[1])]
+        if not new:
+            return {"text": f"already filed: #{existing[0]}", "already": True}
+        wiki.join_collections(existing[0], new)  # no re-analysis: only the frontmatter changes
+        wiki.build_index()
+        try:
+            commit_wiki(f"docs(wiki): add #{existing[0]} to {', '.join(new)}", url)
+        except Exception as e:  # it's in the local wiki and goes out with the next push
+            print(f"[worker] wiki commit failed: {e}", file=sys.stderr)
+        return {"text": f"already filed: #{existing[0]}, added to {', '.join(new)}", "already": True,
+                "collected": new}
 
     cid = existing[0] if existing else wiki.next_capture_id()
     captured = str(existing[1].get("captured")) if existing else date.today().isoformat()
@@ -148,7 +173,7 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
             key_ideas = p.ideas(text, vlm_note)
         entry = wiki.file_capture(cid=cid, captured=captured, url=url, source=source, media=media,
                                   note=note, patterns=patterns, style=look, style_name=style,
-                                  ideas=key_ideas, intent=intent, frames=frames)
+                                  ideas=key_ideas, intent=intent, frames=frames, collections=collections)
     except Exception as e:
         transient = is_transient(e)
         return {"text": f"#{cid} {'will retry' if transient else 'failed'}: {e}",
@@ -163,6 +188,8 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
         # On a computer the capture stays in the local wiki and goes out with the next push.
         print(f"[worker] wiki commit failed: {e} {getattr(e, 'stderr', '') or ''}", file=sys.stderr)
     result = {"text": f"#{cid}: {entry['category']}/{entry['topic']} · {entry['title']}", "entry": entry}
+    if collections:
+        result["text"] += f" · in {', '.join(collections)}"
     if not reanalyze:
         hypar.sync_index(wiki.WIKI)
     if intent == hypar.INTENT and not reanalyze:
@@ -236,11 +263,15 @@ def notify(url: str, result: dict):
         if entry["new_topic"]:
             title += " (new topic)"
         message, tags = f"{entry['title']}\n{entry['summary']}".strip(), ["white_check_mark"]
+        if entry.get("collections"):
+            message += f"\nIn {', '.join(entry['collections'])}"
         if embryo := result.get("embryo"):
             message += "\nPlanted in hypar as a latent embryo"
             url = hypar.embryo_url(embryo["id"])
         elif "hypar_error" in result:
             message += f"\nNot planted in hypar: {result['hypar_error']}"
+    elif result.get("collected"):
+        title, message, tags = f"Added to {', '.join(result['collected'])}", url, ["white_check_mark"]
     elif result.get("already"):
         title, message, tags = "Already saved", url, ["information_source"]
     else:

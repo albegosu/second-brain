@@ -18,6 +18,7 @@ import colorsys
 import re
 from collections import Counter
 from datetime import date
+from pathlib import Path
 
 from . import pipeline as p
 from . import run
@@ -102,11 +103,13 @@ def hue(hex_: str) -> str:
     return next(name for limit, name in HUES if h <= limit)
 
 
-def evidence() -> dict:
-    """Everything the profile is written from, counted by code."""
+def evidence(files: list[Path] | None = None, categories: set[str] = LOOK_CATEGORIES) -> dict:
+    """Everything the profile is written from, counted by code: over every
+    capture, or over files (a collection's). Looks and motion count only the
+    captures filed in categories."""
     c = {name: Counter() for name in ("category", "background", "accent", "property", "easing", *p.STYLE, *p.FACETS)}
     looks, captures, notes = 0, 0, []
-    for f in wiki.source_files():
+    for f in wiki.source_files() if files is None else files:
         meta, body = wiki.read_page(f)
         captures += 1
         c["category"][str(meta.get("topic", "")).split("/")[0] or "unfiled"] += 1
@@ -115,7 +118,7 @@ def evidence() -> dict:
         if note:
             notes.append((meta.get("title", f.stem), rel, note))
 
-        if str(meta.get("topic", "")).split("/")[0] not in LOOK_CATEGORIES:
+        if str(meta.get("topic", "")).split("/")[0] not in categories:
             continue
         if m := re.search(r"^Traits: (.+)$", body, re.M):
             looks += 1

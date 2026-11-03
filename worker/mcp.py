@@ -14,8 +14,9 @@ leaves the machine except what the client itself sends on. Tools:
     get_topic         a topic page by name
     get_page          any wiki page by its path (index, taste, DESIGN.md, AGENTS.md, stack.md, a source note)
     recent_captures   the latest captures, newest first
+    get_collection    the user's collections, or the captures in one
     get_frames        what a visual capture looked like, as an image
-    get_design_md     the taste, its light or dark twin, or a style (one of its looks) as a DESIGN.md
+    get_design_md     the taste, its light or dark twin, a style (one of its looks) or a collection as a DESIGN.md
 """
 from __future__ import annotations
 
@@ -48,7 +49,10 @@ look, a layout or an interaction: the text describes the reference, the image is
 the reference. With no style given by the user or the project, build from
 get_design_md. Before approaching engineering or agent work, read AGENTS.md with
 get_page: the user's practices as rules. Before adding a dependency, read
-stack.md: the saved tools by job, used, to try or stale. Say which pages you used. The wiki holds references and ideas
+stack.md: the saved tools by job, used, to try or stale. When the user names one
+of their collections ("build from my checkout collection"), get_collection lists
+the captures they grouped for it and get_design_md with collection gives the
+look of only those. Say which pages you used. The wiki holds references and ideas
 written by a model, not specs."""
 
 TOOLS = [
@@ -90,6 +94,14 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {
          "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
          "category": CATEGORY}}},
+    {"name": "get_collection",
+     "title": "Collection",
+     "description": "The user's own grouping of captures by what they saved them for (a project, a client, a "
+                    "redesign), next to the model's topics. Without a name, every collection and its size; with "
+                    "one, its captures oldest first: number, title, summary, the topic it is filed under, the "
+                    "source note's path and the original link.",
+     "inputSchema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "The collection's name, like checkout or acme-web"}}}},
     {"name": "get_frames",
      "title": "Capture frames",
      "description": "What a visual capture looked like, as one image: up to four frames in time order, left "
@@ -105,12 +117,14 @@ TOOLS = [
                     "to WCAG AA, type, radius, spacing, components and rules. Without a style, the user's "
                     "taste across all their captures (with tone, its light or dark twin when the captures "
                     "split between the two). With a style topic, that look; with look, one of the topic's "
-                    "other looks. A primary marked Low confidence may be a photo's color: check the frames.",
+                    "other looks. With a collection, the taste's method over only the captures in it. A primary "
+                    "marked Low confidence may be a photo's color: check the frames.",
      "inputSchema": {"type": "object", "properties": {
          "style": {"type": "string", "description": "A style topic's slug, like style-editorial or editorial"},
          "look": {"type": "string", "description": "With style: one of the topic's looks, by name"},
          "tone": {"type": "string", "enum": ["light", "dark"],
-                  "description": "Without style: the taste for that background tone"}}}},
+                  "description": "Without style or collection: the taste for that background tone"},
+         "collection": {"type": "string", "description": "One of the user's collections, like checkout"}}}},
 ]
 for tool in TOOLS:
     tool["annotations"] = READ_ONLY
@@ -204,6 +218,28 @@ def recent_captures(limit: int = 10, category: str | None = None) -> str:
     return "\n".join(lines)
 
 
+def get_collection(name: str | None = None) -> str:
+    known = wiki.collections()
+    if not name:
+        if not known:
+            return "No collections yet: a capture joins one with `collection: <name>` in its note."
+        return "\n".join(f"- {c} ({len(rels)} capture{'' if len(rels) == 1 else 's'})" for c, rels in known.items())
+    rels = known.get(wiki.slugify(name))
+    if not rels:
+        raise ToolError(f"no collection {name!r} (collections: {', '.join(known) or 'none yet'})")
+    lines = [f"Collection {wiki.slugify(name)}: {len(rels)} capture{'' if len(rels) == 1 else 's'}, oldest first, "
+             "each also filed under its topic. Open a note with get_page and its frames with get_frames; "
+             "get_design_md with this collection gives the look of only these.", ""]
+    for rel in rels:
+        meta = wiki.read_page(wiki.WIKI / rel)[0]
+        url = wiki.shown_url(meta)
+        lines.append(f"- #{wiki.capture_number(rel)} {meta.get('title', rel)} → {meta.get('topic', 'unfiled')} · "
+                     f"{rel}" + (f" · {url}" if url else ""))
+        if meta.get("summary"):
+            lines.append(f"  {meta['summary']}")
+    return "\n".join(lines)
+
+
 def get_frames(capture: int) -> list[dict]:
     notes = sorted((wiki.WIKI / "sources").glob(f"*/{int(capture):04d}-*.md"))
     if not notes:
@@ -218,9 +254,17 @@ def get_frames(capture: int) -> list[dict]:
             {"type": "image", "data": base64.b64encode(image.read_bytes()).decode(), "mimeType": mime}]
 
 
-def get_design_md(style: str | None = None, look: str | None = None, tone: str | None = None) -> str:
+def get_design_md(style: str | None = None, look: str | None = None, tone: str | None = None,
+                  collection: str | None = None) -> str:
     if look and not style:
         raise ToolError("look needs style: the style topic it belongs to")
+    if collection and (style or tone):
+        raise ToolError("collection takes neither style nor tone: it is a look of its own")
+    if collection:
+        made = design_md.generate(model=False, collection=collection)
+        if not made:
+            raise ToolError(design_md.missing_collection(collection))
+        return made[2]
     if not style:  # the weekly files have the model's prose; the template's tokens are the same
         d = design_md.taste_design(tone) if tone else None
         twin = d and d["pair"] and d["pair"]["path"] != design_md.PATH
@@ -241,7 +285,8 @@ def get_design_md(style: str | None = None, look: str | None = None, tone: str |
 
 
 HANDLERS = {"get_index": get_index, "search": search, "get_topic": get_topic, "get_page": None,
-            "recent_captures": recent_captures, "get_frames": get_frames, "get_design_md": get_design_md}
+            "recent_captures": recent_captures, "get_collection": get_collection, "get_frames": get_frames,
+            "get_design_md": get_design_md}
 
 
 def call(name: str, args: dict) -> dict:

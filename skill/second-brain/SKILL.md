@@ -1,6 +1,6 @@
 ---
 name: second-brain
-description: The user's personal knowledge base, kept as a Markdown wiki of things they saved from X, Instagram, LinkedIn and the web. It has four categories. design covers UI patterns, interactions, motion and visual styles. features covers product functionality worth building. tools covers apps, libraries and services. practices covers how to work: engineering practices, workflows with AI agents and lessons from articles. It also turns the user's taste, or one saved style, into a DESIGN.md to build UI from. Check it BEFORE designing or implementing a UI component, animation, interaction or product feature, before choosing a tool or library, and when deciding how to approach agent or engineering work, in case there is a saved reference. Also use it when asked "¿tengo algo guardado sobre…?", "busca en mi second brain", "what did I save about…", "hazlo con el estilo X", or for inspiration.
+description: The user's personal knowledge base, kept as a Markdown wiki of things they saved from X, Instagram, LinkedIn and the web. It has four categories. design covers UI patterns, interactions, motion and visual styles. features covers product functionality worth building. tools covers apps, libraries and services. practices covers how to work: engineering practices, workflows with AI agents and lessons from articles. It also turns the user's taste, one saved style or one of their collections (captures grouped by project or client) into a DESIGN.md to build UI from. Check it BEFORE designing or implementing a UI component, animation, interaction or product feature, before choosing a tool or library, and when deciding how to approach agent or engineering work, in case there is a saved reference. Also use it when asked "¿tengo algo guardado sobre…?", "busca en mi second brain", "what did I save about…", "hazlo con el estilo X", "build from my X collection", or for inspiration.
 ---
 
 # Second brain
@@ -15,7 +15,7 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
 
 ## How to use it
 
-1. Read `wiki/index.md` first. For every topic it lists a one-line summary, the blocks the page holds (patterns, styles, options or ideas) and how often it was used in a build, plus the latest captures. Match on block names, not only topic titles. Don't read whole folders.
+1. Read `wiki/index.md` first. For every topic it lists a one-line summary, the blocks the page holds (patterns, styles, options or ideas) and how often it was used in a build, then the user's collections with their captures, plus the latest captures. Match on block names, not only topic titles. Don't read whole folders.
 2. Open only the matching topic pages (`wiki/<category>/<topic>.md`). Their structure is fixed, one `### <name> [n]` block per item:
    - `## Patterns` (design, features): **Use it when**, **How it works** (numbered steps), **Motion** and **Watch out**. One block is enough to build that pattern.
    - `## Styles` (design topics named `style-*` or made of looks): **Tokens** (measured palette, type family, radius, spacing, depth, motion feel), **Composition**, **Do**, **Don't**, **Use it for**. To build with one, generate its DESIGN.md (see "When building from it").
@@ -40,6 +40,11 @@ git -C ~/Developer/second-brain-wiki pull --ff-only -q
   cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.design_md --style <slug> --out <project>/DESIGN.md
   ```
   The slug is the topic's file name (`style-editorial`, or just `editorial`); without `--out` it prints. A topic with several looks (one `### Name [n]` block each) gives its dominant one and names the others; add `--look "<name>"` to build from another. A model writes only the overview and rules; `--no-model` skips it (a template writes them) when Ollama isn't reachable. The file carries capture numbers for the usage log but no links or post text; it is still derived from private captures, so ask before committing it to a public repository, and never overwrite a DESIGN.md the project already has.
+- Building for one of the user's collections ("build from my checkout collection", "hazlo con mi colección acme")? A collection is the user's own grouping by what they saved captures for (a project, a client, a redesign); the index's **Collections** section lists each one with its captures, which are also filed in their topics. Read those captures' source notes and frames, not the whole topics they sit in. For the look, generate the collection's DESIGN.md: the taste's method over only its design and features captures, so nothing from outside the collection gets in.
+  ```bash
+  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki .venv/bin/python -m worker.design_md --collection <name> --out <project>/DESIGN.md
+  ```
+  The same cautions as a style's DESIGN.md apply: ask before committing it to a public repository, and never overwrite one the project already has.
 - Deciding how to approach engineering or agent work (structuring a task, testing, reviewing, setting up an agent or its tools)? Read `wiki/AGENTS.md` if it exists: the user's practices as rules. Its **Rules** have evidence behind them (two or more captures, or a use in a build): follow them unless the user or the project says otherwise. **Worth trying** are suggestions from a single capture: use them when they fit. The project's own AGENTS.md, CLAUDE.md or instructions always win. Each line ends with its capture numbers, for the usage log below.
   To put it in a project, write it next to the project's files rather than over them, and never overwrite an AGENTS.md the project already has:
   ```bash
@@ -66,6 +71,10 @@ cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRA
 ```
 
 - Put `style: <name>` in the note to file the capture under the design topic `style-<name>`.
+- Put `collection: <name>` (or `colección: <name>`) in the note to add the capture to one of the user's collections, a project or client of theirs in kebab-case. It stays in the topic the model picks; repeat the keyword for several collections. To add captures that are already filed, without analyzing them again (`--remove` takes them out):
+  ```bash
+  cd ~/Developer/second-brain && BRAIN_WIKI=~/Developer/second-brain-wiki/wiki BRAIN_GIT_SYNC=1 .venv/bin/python -m worker.collect 7 21 <name>
+  ```
 - Topic pages are rewritten from their source notes whenever a capture arrives or the weekly lint pass reorganizes topics, so manual edits to a topic page don't last. Put lasting context in the capture's note instead.
 - `wiki/index.md`, `wiki/taste.md`, `wiki/DESIGN.md` and `wiki/usage.md` are written by code, so never edit them by hand.
 - Don't commit wiki changes: the worker commits and pushes them to the wiki repository. Engine code changes (`~/Developer/second-brain` by default) are the user's to commit.
