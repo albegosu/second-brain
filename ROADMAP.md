@@ -92,6 +92,14 @@ is rough priority.
 - **Topic hierarchy.** When a category grows, group topics into clusters and
   subtopics so the index stays scannable in one read.
   *Inspired by ContextBolt's topic clusters.*
+- **Collections you choose.** `collection: <name>` in the note adds the capture
+  to a project or client of yours without moving it from its topic, and a
+  capture can be in several. The index lists them, and
+  `worker.design_md --collection <name>` writes the DESIGN.md of only those
+  captures. Topics are the model's organization; what you saved something *for*
+  is yours, and no model can infer it.
+  [#78](https://github.com/albegosu/second-brain/issues/78)
+  *Inspired by marked's collections.*
 - **Answers filed back.** When Claude answers a question from the wiki, let it
   save the synthesis as a page, so exploration compounds instead of evaporating.
   *Inspired by Karpathy's LLM wiki pattern.*
@@ -149,7 +157,13 @@ projects are developed apart; only what the bridge needs is synchronized, in the
 - **Curated references as a fallback.** When the wiki has nothing on a subject,
   the skill looks it up in curated libraries and says so, keeping your own saves
   first.
-  *Mobbin MCP and Refero MCP.*
+  *Mobbin MCP, Refero MCP and marked's Explore.*
+- **A prompt per capture.** `python -m worker.prompt <n>` prints a prompt that
+  stands on its own (title and author, what it shows, its pattern steps, frames
+  and source) and ends with how to open the full note, to hand one reference to
+  an agent without the skill or the MCP server, or paste it into a chat.
+  [#79](https://github.com/albegosu/second-brain/issues/79)
+  *Inspired by marked's "Copy prompt".*
 - ~~**MCP server over the wiki.**~~ Done: `bin/second-brain-mcp`, a read-only
   stdio server with index, search, topic and page lookup, recent captures,
   frames as images and DESIGN.md, for clients that don't load skills (Claude
