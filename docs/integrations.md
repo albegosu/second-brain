@@ -22,8 +22,36 @@ wiki goes nowhere except to the client you connect.
 | `get_frames` | What a visual capture looked like, as an image |
 | `get_design_md` | The taste (or its light or dark twin), or a style or one of its looks, as a DESIGN.md |
 
-Point the client at the launcher. For Claude Desktop, in
-`claude_desktop_config.json`; Cursor's `~/.cursor/mcp.json` has the same shape:
+### Connect your agents
+
+`bin/connect` finds the agents installed on your computer and connects each one
+the way it reads the wiki best (`bin/setup` runs it at the end):
+
+| Agent | How | Where |
+|---|---|---|
+| Claude Code | The skill, linked | `~/.claude/skills/second-brain` |
+| Cursor | MCP | `~/.cursor/mcp.json` |
+| Codex | MCP | `~/.codex/config.toml` (or `$CODEX_HOME`) |
+| Claude Desktop | MCP | `claude_desktop_config.json` in Claude's settings folder |
+| Windsurf | MCP | `~/.codeium/windsurf/mcp_config.json` |
+| VS Code | MCP | `mcp.json` in VS Code's user settings folder |
+| Gemini CLI | MCP | `~/.gemini/settings.json` |
+
+```bash
+bin/connect                  # lists your agents and connects the ones that aren't, asking for each
+bin/connect cursor codex     # only these
+bin/connect --status         # the list, without changing anything
+bin/connect --remove cursor  # disconnects one
+```
+
+It writes or removes only its own `second-brain` entry: other servers and
+settings stay, and the file keeps its permissions. A file it can't parse, such
+as a JSON with comments, is left alone. An entry that points at another engine
+folder, because the engine moved, shows as stale and gets the current path,
+keeping anything else it says, such as an `env`.
+
+For any other client (Zed, for one), `bin/connect other` prints the snippet to
+paste into its MCP settings, with this engine's path:
 
 ```json
 {

@@ -21,8 +21,10 @@ In order:
    values the capture trigger reads. With a Supabase access token it runs the
    SQL itself; without one it writes the SQL to a file for the SQL editor.
 5. Adds what's missing to the engine's .env and, on macOS, optionally installs
-   a LaunchAgent that pulls the wiki every 15 minutes and links the skill.
-6. Prints how to connect each device: the Shortcut's three values, and a
+   a LaunchAgent that pulls the wiki every 15 minutes.
+6. Connects your coding agents (bin/connect): the skill for Claude Code, the
+   MCP server for Cursor, Codex, Claude Desktop and the rest it finds.
+7. Prints how to connect each device: the Shortcut's three values, and a
    setup link for the capture page, also as a QR code to scan with the phone
    (if the `qrencode` command or the `segno` or `qrcode` Python package is
    available).
@@ -279,7 +281,8 @@ def main():
     ap.add_argument("--supabase-ref", help="Supabase project ref, or its https://<ref>.supabase.co URL")
     ap.add_argument("--env-file", type=Path, default=ENGINE / ".env", help="engine settings to complete")
     ap.add_argument("--no-launch-agent", action="store_true", help="don't install the macOS pull LaunchAgent")
-    ap.add_argument("--no-skill", action="store_true", help="don't link the skill into ~/.claude/skills")
+    ap.add_argument("--no-agents", "--no-skill", dest="no_agents", action="store_true",
+                    help="don't connect your coding agents (bin/connect does it later)")
     args = ap.parse_args()
 
     step("Checking git and gh")
@@ -407,14 +410,11 @@ def main():
             print("    macOS doesn't let LaunchAgents read Documents, Desktop or Downloads: move the clone first")
         else:
             print(f"    installed {launch_agent(args.name, dest)}")
-    skills = Path.home() / ".claude" / "skills" / "second-brain"
-    if not args.no_skill and not skills.exists() and confirm("    Link the skill into ~/.claude/skills?"):
-        skills.parent.mkdir(parents=True, exist_ok=True)
-        skills.symlink_to(ENGINE / "skill" / "second-brain")
-        print(f"    linked {skills}")
-    default_wiki = Path.home() / "Developer" / "second-brain-wiki" / "wiki"
-    if dest / "wiki" != default_wiki:
-        print(f"    the skill looks in {default_wiki} unless BRAIN_WIKI is set where your agent runs")
+    if not args.no_agents:
+        step("Agents")
+        sys.path.insert(0, str(ENGINE))
+        from worker import connect
+        connect.offer(confirm)
 
     link = setup_link(settings)
     code = qr(link)

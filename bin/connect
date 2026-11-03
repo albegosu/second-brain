@@ -1,0 +1,5 @@
+#!/bin/sh
+# Connects your coding agents to the wiki: the skill for Claude Code, the MCP server for the rest.
+# Standard library only, so it runs before the virtualenv exists. bin/connect --help for the options.
+cd "$(dirname "$0")/.." || exit 1
+exec python3 -m worker.connect "$@"

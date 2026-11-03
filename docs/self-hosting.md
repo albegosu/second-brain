@@ -133,8 +133,9 @@ workflow's 6-hour run prevents that.
 
 ## Skill
 
-Link it where Claude reads skills:
+Link it where Claude reads skills, along with the MCP server for your other
+agents ([bin/connect](integrations.md#other-agents-mcp)):
 
 ```bash
-ln -s ~/Developer/second-brain/skill/second-brain ~/.claude/skills/second-brain
+bin/connect claude-code
 ```
