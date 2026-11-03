@@ -1,0 +1,18 @@
+#!/bin/sh
+# Runs a worker module from anywhere with the engine's .env: bin/worker design_md --style editorial
+# The skill calls it through its own link (~/.claude/skills/second-brain/../../bin/worker), so it finds
+# the engine wherever it was cloned. Relative paths in the arguments are read from where it's run.
+if [ $# -eq 0 ]; then
+  echo "usage: bin/worker <module> [arguments], e.g. bin/worker design_md --style editorial" >&2
+  exit 2
+fi
+engine=$(cd -P "$(dirname "$0")/.." && pwd -P) || exit 1
+if [ ! -x "$engine/.venv/bin/python" ]; then
+  echo "bin/worker: $engine has no virtualenv yet: see docs/self-hosting.md#install-the-worker-locally" >&2
+  exit 1
+fi
+if [ -f "$engine/.env" ]; then set -a; . "$engine/.env"; set +a; fi
+module=$1
+shift
+export PYTHONPATH="$engine${PYTHONPATH:+:$PYTHONPATH}" PYTHONSAFEPATH=1
+exec "$engine/.venv/bin/python" -m "worker.$module" "$@"

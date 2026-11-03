@@ -166,4 +166,10 @@ python -m worker.run --image ~/Desktop/screenshot.png --note "the empty state"
 ```
 
 This runs the worker on your computer, so it needs the
-[local install](self-hosting.md#install-the-worker-locally) first.
+[local install](self-hosting.md#install-the-worker-locally) first. From any
+other folder, `bin/worker` runs the same modules with the engine's `.env`
+loaded, which is how the skill calls them:
+
+```bash
+~/Developer/second-brain/bin/worker run --image screenshot.png --note "the empty state"
+```
