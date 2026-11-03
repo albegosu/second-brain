@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""DESIGN.md: the owner's taste, or one saved style, as design tokens an agent follows.
+"""DESIGN.md: the owner's taste, one saved style or one collection, as design tokens an agent follows.
 
     python -m worker.design_md                          # rewrite wiki/DESIGN.md from the taste and commit it
     python -m worker.design_md --tone dark              # the taste's dark variant, printed
     python -m worker.design_md --style editorial        # one style topic (design/style-editorial), printed
     python -m worker.design_md --style editorial --look "Night Edition"   # one of its looks
     python -m worker.design_md --style editorial --out ~/code/app/DESIGN.md
+    python -m worker.design_md --collection checkout    # only the captures of a collection, printed
     python -m worker.design_md --dry-run                # print the derived tokens and change nothing
     python -m worker.design_md --no-model               # template prose, no model call
 
@@ -30,6 +31,12 @@ DESIGN.md describes the dominant one unless --look names another: each trait
 takes the value most of the look's captures share (the newest capture breaks a
 tie), and the colors come from the one capture that matches those traits best
 (the newest on a tie), so palettes of different looks are never mixed.
+
+A collection (worker/collect.py) gets the taste's method over its own captures
+only: counts and leads over its design and features captures (an interface's
+look; a tool's landing page or an article's screenshot wasn't saved for its
+look), from a single capture with a look up, and never as a light and dark
+pair. No capture outside the collection is ever counted.
 
 When a capture of a live web page recorded its computed CSS, the fonts, the
 most common transition and the shadow come from it instead of defaults: a style
@@ -466,26 +473,45 @@ def second_tone(background: Counter) -> str | None:
     return other if background[other] >= taste.MIN_LOOKS else None
 
 
-def taste_design(tone: str | None = None) -> dict | None:
+# The categories whose looks a collection counts: interfaces.
+COLLECTION_LOOKS = {"design", "features"}
+
+
+def missing_collection(name: str) -> str:
+    """Why a collection has no DESIGN.md, for the command and the MCP server."""
+    known = wiki.collections()
+    if wiki.slugify(name) not in known:
+        return f"no collection {name!r} (collections: {', '.join(known) or 'none yet'})"
+    return f"no design or features capture with a measured look in the collection {wiki.slugify(name)}"
+
+
+def taste_design(tone: str | None = None, collection: str | None = None) -> dict | None:
     """The owner's default look: taste.md's counts for the traits. Colors come from
     the design captures with the leading background tone (or the tone asked for):
     the neutrals of the one whose page color is the most typical (one palette, so
     they belong together), and the most typical shade of the leading accent hue.
     When the captures split between light and dark (second_tone), each tone's
-    accent hue is counted on its own captures, so the pair differs only in color."""
-    ev = taste.evidence()
-    if ev["looks"] < taste.MIN_LOOKS:
+    accent hue is counted on its own captures, so the pair differs only in color.
+    With a collection, the same over its captures only (COLLECTION_LOOKS), never
+    as a pair."""
+    files, categories = None, taste.LOOK_CATEGORIES
+    if collection:
+        collection = wiki.slugify(collection)
+        files = [wiki.WIKI / rel for rel in wiki.collections().get(collection, [])]
+        categories = COLLECTION_LOOKS
+    ev = taste.evidence(files, categories)
+    if ev["looks"] < (1 if collection else taste.MIN_LOOKS):
         return None
     c = ev["counts"]
     traits = {"typography": choose(c["typography"])}
     traits.update({k: choose(c[k], DEFAULTS[k], k) for k in ("radius", "spacing", "depth", "motion_feel")})
 
     main, tone_why = choose(c["background"])
-    other = second_tone(c["background"])
+    other = None if collection else second_tone(c["background"])
     if tone not in (None, main, other):
         return None
     tone = tone or main
-    mine = [look for look in looks() if look["category"] in taste.LOOK_CATEGORIES and look["neutrals"]]
+    mine = [look for look in looks(files) if look["category"] in categories and look["neutrals"]]
     backgrounds = [look for look in mine if taste.tone(look["neutrals"][0]) == tone] or mine
     page = medoid([look["neutrals"][0] for look in backgrounds]) if backgrounds else None
     neutrals = next((look["neutrals"] for look in backgrounds if look["neutrals"][0] == page), [])
@@ -533,9 +559,16 @@ def taste_design(tone: str | None = None) -> dict | None:
     description = (f"The default {tone} look across {ev['looks']} saved design captures, colors from the "
                    f"{len(backgrounds)} with a {tone} background, as design tokens." if paired else
                    f"The default look across {ev['looks']} saved design captures, as design tokens.")
-    return {"kind": "taste", "name": f"Taste ({tone})" if paired and tone != main else "Taste", "key": None,
+    name = f"Taste ({tone})" if paired and tone != main else "Taste"
+    captures = []
+    if collection:
+        name = collection.replace("-", " ").title()
+        captures = [look["capture"] for look in looks(files) if look["category"] in categories]
+        description = (f"The look of the collection {collection}, across its {plural(ev['looks'], 'capture')} "
+                       "with a measured look, as design tokens.")
+    return {"kind": "collection" if collection else "taste", "name": name, "key": None, "collection": collection,
             "pair": pair, "description": description,
-            "captures": [], "looks": ev["looks"], "traits": traits, "colors": colors, "origin": origin,
+            "captures": captures, "looks": ev["looks"], "traits": traits, "colors": colors, "origin": origin,
             "doubts": doubts(colors["primary"], bool(accents), set()),
             "unsettled": unsettled, "evidence": taste.evidence_lines(ev, verdict=True),
             "counts": {k: tally(c[k]) for k in ("layout", "density", "easing", "property") if c[k]},
@@ -727,6 +760,10 @@ def cap(text: str) -> str:
     return text[:1].upper() + text[1:]
 
 
+def plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
 def listed(words: list[str]) -> str:
     return ", ".join(words[:-1]) + f" and {words[-1]}" if len(words) > 1 else "".join(words)
 
@@ -792,9 +829,12 @@ def template(d: dict) -> dict:
     look = (f"{WORDS.get(t['typography'], 'system sans-serif')} type on a {taste.tone(d['colors']['neutral'])} "
             f"background, {WORDS.get(t['radius'], 'barely rounded')} corners, {t['spacing']} spacing and "
             f"{WORDS.get(t['depth'], 'flat')} surfaces, with {feel} motion")
-    if d["kind"] == "taste":
+    if d["kind"] in ("taste", "collection"):
         overview = (f"The look the owner keeps saving, across {d['looks']} design captures: {look}. It is the "
-                    "starting point when neither the user nor the project sets a style.")
+                    "starting point when neither the user nor the project sets a style." if d["kind"] == "taste"
+                    else f"The look of the owner's collection {d['collection']}, across "
+                         f"{plural(d['looks'], 'capture')} with a measured look: {look}. It is the starting point "
+                         "for what the collection was saved for.")
         if d["unsettled"]:
             overview += (f" The captures don't settle the {listed(d['unsettled'])}: the tokens use the most "
                          "frequent value, so follow the project where it has an opinion.")
@@ -876,6 +916,9 @@ def render(d: dict, tok: dict, text: dict) -> str:
     if d["kind"] == "taste":
         tone = f" --tone {d['pair']['tone']}" if d.get("pair") and d["pair"]["path"] != PATH else ""
         source = f"from the taste of {d['looks']} saved design captures (`python -m worker.design_md{tone}`)"
+    elif d["kind"] == "collection":
+        source = (f"from the collection `{d['collection']}`, captures {', '.join(f'#{n}' for n in d['captures'])} "
+                  f"(`python -m worker.design_md --collection {d['collection']}`)")
     else:
         look = f" --look {json.dumps(d['look'], ensure_ascii=False)}" if d.get("look") else ""
         source = (f"from the style topic `{d['key']}`, captures {', '.join(f'#{n}' for n in d['captures'])} "
@@ -978,15 +1021,16 @@ def render(d: dict, tok: dict, text: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def design(style: str | None = None, look: str | None = None, tone: str | None = None) -> dict | None:
-    return style_design(style, look) if style else taste_design(tone)
+def design(style: str | None = None, look: str | None = None, tone: str | None = None,
+           collection: str | None = None) -> dict | None:
+    return style_design(style, look) if style else taste_design(tone, collection)
 
 
 def generate(style: str | None = None, model: bool = True, look: str | None = None,
-             tone: str | None = None) -> tuple[dict, dict, str] | None:
+             tone: str | None = None, collection: str | None = None) -> tuple[dict, dict, str] | None:
     """The design, its tokens and the DESIGN.md text; None when there is nothing to
     derive it from."""
-    d = design(style, look, tone)
+    d = design(style, look, tone, collection)
     if not d:
         return None
     tok = tokens(d)
@@ -1036,20 +1080,25 @@ def main():
     ap.add_argument("--look", help="with --style: one of the topic's looks, by its name; default: the dominant one")
     ap.add_argument("--tone", choices=("light", "dark"),
                     help="the taste for that background tone, when the captures split between light and dark")
+    ap.add_argument("--collection", help="one of your collections: the taste's method over its captures only")
     ap.add_argument("--out", help="file to write, or - to print; default: wiki/DESIGN.md (and its light or dark "
-                                  "twin) for the taste, printed for a style or a tone")
+                                  "twin) for the taste, printed for a style, a tone or a collection")
     ap.add_argument("--dry-run", action="store_true", help="print the derived tokens and change nothing")
     ap.add_argument("--no-model", action="store_true", help="write the prose from a template, without a model")
     args = ap.parse_args()
     if args.look and not args.style:
         ap.error("--look needs --style")
-    if args.tone and args.style:
-        ap.error("--tone is for the taste, not a style")
+    if args.tone and (args.style or args.collection):
+        ap.error(f"--tone is for the taste, not a {'style' if args.style else 'collection'}")
+    if args.style and args.collection:
+        ap.error("--style and --collection are two different sources: pick one")
 
     try:
-        d = design(args.style, args.look, args.tone)
+        d = design(args.style, args.look, args.tone, args.collection)
     except NoLook as e:
         sys.exit(f"[design] {e}")
+    if not d and args.collection:
+        sys.exit(f"[design] {missing_collection(args.collection)}")
     if not d:
         known = ", ".join(t["slug"] for t in style_topics()) or "none"
         background = taste.evidence()["counts"]["background"]
@@ -1060,7 +1109,7 @@ def main():
     tok = tokens(d)
     if args.dry_run:
         return dry_run(d, tok)
-    if not (args.style or args.tone or args.out):
+    if not (args.style or args.tone or args.collection or args.out):
         build(model=not args.no_model)
         wiki.build_index()
         run.commit_wiki("docs(wiki): refresh DESIGN.md")

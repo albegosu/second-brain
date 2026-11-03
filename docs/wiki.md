@@ -14,7 +14,7 @@ repository are public and print what was captured. Point `BRAIN_WIKI` at its
 
 ```
 wiki/
-  index.md                      map of topics; written by code
+  index.md                      map of topics and collections; written by code
   taste.md                      recurring choices across captures; weekly
   DESIGN.md                     the same taste as design tokens; weekly
   DESIGN.dark.md                its dark twin, when the captures split (or .light)
@@ -51,7 +51,8 @@ or page text, and a link to the original. Commands, code and config (a README's
 fenced blocks, a page's `<pre>` blocks, shell commands in your note, a post or
 its page) are kept verbatim under **Code**, up to six blocks. A GitHub
 repository also gets its language, license, last commit date, archived status
-and stars, in the note's frontmatter (`repo`) and under **Repository**.
+and stars, in the note's frontmatter (`repo`) and under **Repository**. The
+[collections](#collections) a capture is in are in its frontmatter too.
 
 ## Topic pages
 
@@ -69,6 +70,32 @@ at most spoil a text, never the navigation.
 
 A note with `style: name` (or `estilo: name`) files the capture under
 `design/style-name`, to collect a look across several captures.
+
+## Collections
+
+Topics are the model's organization, by what a capture shows. Collections are
+yours: what you saved a capture for, such as a project, a client or a redesign,
+which no model can infer. A capture joins one from its note (`collection:
+<name>`, see [keywords in the note](capture.md#keywords-in-the-note)) or later
+with a command. Either way it stays in its topic, and it can be in several
+collections.
+
+The source note keeps them in its frontmatter, written by code
+(`collections: ["acme", "checkout"]`; a hand-edited YAML list is read too). The
+command changes only that line: no re-analysis and no model. Re-analysis keeps
+what the frontmatter says, so a capture you took out of a collection stays out
+even if its note still names it.
+
+```bash
+python -m worker.collect 7 21 checkout            # add captures #7 and #21 to checkout
+python -m worker.collect 21 checkout --remove     # take #21 out of it
+```
+
+The index lists each collection with its captures, after the categories. A
+collection gets its own DESIGN.md, from only its captures
+([outputs.md](outputs.md#designmd)), and the skill and the MCP server
+(`get_collection`, and `get_design_md` with a `collection`) read it, so "build
+from my checkout collection" works.
 
 ## How it's written
 

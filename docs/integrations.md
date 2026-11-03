@@ -14,13 +14,14 @@ wiki goes nowhere except to the client you connect.
 
 | Tool | What it returns |
 |---|---|
-| `get_index` | The map: topics, what each holds, uses, latest captures |
+| `get_index` | The map: topics, what each holds, uses, your collections, latest captures |
 | `search` | Topic pages and source notes that mention some words, best first |
 | `get_topic` | A topic page by title or slug |
 | `get_page` | Any wiki page by its path: a source note, `taste.md`, `DESIGN.md`… |
 | `recent_captures` | The latest captures, newest first, with their links |
+| `get_collection` | Your [collections](wiki.md#collections), or the captures in one |
 | `get_frames` | What a visual capture looked like, as an image |
-| `get_design_md` | The taste (or its light or dark twin), or a style or one of its looks, as a DESIGN.md |
+| `get_design_md` | The taste (or its light or dark twin), a style or one of its looks, or a collection, as a DESIGN.md |
 
 ### Connect your agents
 

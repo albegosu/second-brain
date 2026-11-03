@@ -92,13 +92,15 @@ is rough priority.
 - **Topic hierarchy.** When a category grows, group topics into clusters and
   subtopics so the index stays scannable in one read.
   *Inspired by ContextBolt's topic clusters.*
-- **Collections you choose.** `collection: <name>` in the note adds the capture
-  to a project or client of yours without moving it from its topic, and a
-  capture can be in several. The index lists them, and
+- ~~**Collections you choose.**~~ Done: `collection: <name>` (or `colección:`)
+  in the note adds the capture to a project or client of yours without moving
+  it from its topic, and a capture can be in several; `worker/collect.py` adds
+  one already filed without re-analysis. The source note's frontmatter keeps
+  them, the index lists each with its captures, and
   `worker.design_md --collection <name>` writes the DESIGN.md of only those
-  captures. Topics are the model's organization; what you saved something *for*
-  is yours, and no model can infer it.
-  [#78](https://github.com/albegosu/second-brain/issues/78)
+  captures. The skill and the MCP server (`get_collection`) read them. Topics
+  are the model's organization; what you saved something *for* is yours, and no
+  model can infer it. [#78](https://github.com/albegosu/second-brain/issues/78)
   *Inspired by marked's collections.*
 - **Answers filed back.** When Claude answers a question from the wiki, let it
   save the synthesis as a page, so exploration compounds instead of evaporating.

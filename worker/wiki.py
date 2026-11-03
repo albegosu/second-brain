@@ -1,6 +1,6 @@
 """The wiki: what remains of each capture, in Markdown and in English.
 
-    wiki/index.md                            written by code: topics and the patterns they hold
+    wiki/index.md                            written by code: topics and the patterns they hold, collections
     wiki/taste.md                            recurring choices across captures (worker/taste.py)
     wiki/DESIGN.md                           the same taste as design tokens (worker/design_md.py)
     wiki/DESIGN.<tone>.md                    its dark or light twin, when the captures split between the two
@@ -16,6 +16,11 @@ source notes, so pages don't drift the way incremental merges do. The structure
 (frontmatter, "See also", sources list, index) is written by code, so a bad model
 answer can at most spoil a text, never the navigation. Reorganizing topics lives
 in worker/lint.py. No git here: commit and push happen in run.commit_wiki().
+
+Collections are the user's organization, next to the model's topics: what a
+capture was saved for (a project, a client). A source note keeps the ones it is
+in as `collections` in its frontmatter, written by code; a capture stays in its
+topic and can be in several.
 """
 from __future__ import annotations
 
@@ -49,6 +54,10 @@ INTENTS = {
     "idea to read": "ideas about how to work (practices)",
     "idea to grow": "something that sparked an idea of the user's own; file the capture where it belongs by itself",
 }
+
+# "collection: name" (or "colección: name") in a note: what the capture was saved
+# for. It says nothing about what the capture shows, so no model reads it.
+COLLECTION_TAG = re.compile(r"\b(?:collection|colecci[oó]n):\s*([a-z0-9][a-z0-9-]*)", re.I)
 
 # Each category's block section on a topic page, as the index labels it.
 SECTIONS = ("Patterns", "Options", "Ideas", "Styles")
@@ -242,6 +251,44 @@ def next_capture_id() -> int:
     return max((capture_number(f.name) for f in source_files()), default=0) + 1
 
 
+def note_collections(meta: dict) -> list[str]:
+    """The collections a source note is in. Code writes them as a JSON list; a
+    hand-edited note may hold plain YAML ([a, b]) or a single name."""
+    value = meta.get("collections") or []
+    if isinstance(value, str):
+        value = value.strip("[]").split(",")
+    return sorted({slugify(str(v)) for v in value if str(v).strip(" '\"")})
+
+
+def collections() -> dict[str, list[str]]:
+    """Each collection with the source notes in it, oldest capture first."""
+    out = {}
+    for f in source_files():
+        for name in note_collections(read_page(f)[0]):
+            out.setdefault(name, []).append(f.relative_to(WIKI).as_posix())
+    return {name: sorted(rels, key=capture_number) for name, rels in sorted(out.items())}
+
+
+def join_collections(cid: int, names: list[str], leave: bool = False) -> list[str] | None:
+    """Adds a capture to collections, or takes it out of them, in its source
+    note's frontmatter: no re-analysis, and nothing else in the note changes.
+    Returns the collections it is in now; None if there is no such capture."""
+    path = next(iter(sorted((WIKI / "sources").glob(f"*/{int(cid):04d}-*.md"))), None)
+    if not path:
+        return None
+    meta, body = read_page(path)
+    before = note_collections(meta)
+    names = {slugify(n) for n in names}
+    now = sorted(set(before) - names if leave else {*before, *names})
+    if now != before:
+        if now:
+            meta["collections"] = now
+        else:
+            meta.pop("collections", None)
+        write_page(path, meta, body)
+    return now
+
+
 def outside_code(text: str, fn) -> str:
     """fn applied to the text between fenced code blocks, so a rewrite of the
     Markdown never touches a command or a snippet."""
@@ -425,6 +472,19 @@ def index_text() -> str:
     for f in source_files():
         m, _ = read_page(f)
         recent.append((str(m.get("captured", "")), capture_number(f.name), f, m))
+
+    if chosen := collections():
+        notes = {f.relative_to(WIKI).as_posix(): m for _, _, f, m in recent}
+        lines += ["## Collections", "",
+                  "_Yours, not the model's: what captures were saved for (`collection: <name>` in the note). Each "
+                  "capture also stays in its topic. A collection's DESIGN.md: `python -m worker.design_md "
+                  "--collection <name>`._", ""]
+        for name, rels in chosen.items():
+            lines.append(f"- **{name}** ({len(rels)} capture{'' if len(rels) == 1 else 's'})")
+            lines += [f"  - #{capture_number(rel)} [{notes[rel].get('title', rel)}]({rel}) → "
+                      f"{notes[rel].get('topic', '')}" for rel in rels]
+        lines.append("")
+
     if recent:
         recent.sort(key=lambda r: (r[0], r[1]), reverse=True)
         lines += ["## Recent captures", ""]
@@ -604,14 +664,16 @@ def tidy(md: str) -> str:
 def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                  note: str | None, patterns: list, style: dict | None,
                  style_name: str | None = None, ideas: list | None = None,
-                 intent: str | None = None, frames: list | None = None) -> dict:
+                 intent: str | None = None, frames: list | None = None,
+                 collections: list[str] | None = None) -> dict:
     # Your note's commands first, then the post's (what its author chose to show),
     # then the page's. A page with no code blocks of its own (a social post's
     # caption, a page read as text) may still name commands in its text.
     page_text = "" if media.get("code") else str((media.get("page") or {}).get("excerpt") or "")
     code = p.unique_snippets([*p.snippets(text=note or ""), *p.snippets(text=media.get("text") or ""),
                               *(media.get("code") or []), *p.snippets(text=page_text)])
-    body = source_body(note=note, text=media.get("text"), page=media.get("page"),
+    shown_note = COLLECTION_TAG.sub("", note or "").strip(" \n,;.—–-") or None  # the frontmatter keeps it whole
+    body = source_body(note=shown_note, text=media.get("text"), page=media.get("page"),
                        patterns=patterns, style=style, ideas=ideas or [],
                        long_text=bool(media.get("article")), speech=media.get("speech") or "",
                        code=code, repo=media.get("repo"))
@@ -657,6 +719,7 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
                {"title": title, "summary": summary, "url": url, "source": source,
                 "author": media.get("author"), "captured": captured,
                 "topic": key, "tags": tags, "capture": cid, "note": note, "analyzed": ANALYZED,
+                **({"collections": sorted(set(collections))} if collections else {}),
                 **({"repo": media["repo"]} if media.get("repo") else {})},
                f"# {title}\n\n{summary}\n\n"
                f"Filed under [{meta['title']}](../../{key}.md)"
@@ -676,4 +739,4 @@ def file_capture(*, cid: int, captured: str, url: str, source: str, media: dict,
             write_topic(WIKI / f"{old}.md", old_meta, compose(old, old_meta))
     build_index()
     return {"category": category, "topic": slug, "topic_title": meta["title"], "title": title,
-            "summary": summary, "new_topic": new_topic, "source": rel}
+            "summary": summary, "new_topic": new_topic, "source": rel, "collections": sorted(set(collections or []))}
