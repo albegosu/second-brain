@@ -142,8 +142,8 @@ Shortcut, so nothing changes on the server. It works with either
 - **Offline or paused project:** a capture that can't be sent waits in the
   browser, shown next to the send button with **Retry now**, and is retried when
   you open the page again or come back online.
-- **Light and dark:** it follows the system's theme. The dark one is derived from
-  the same Paper and Ink tokens.
+- **Light and dark:** it follows the system's theme. Both are a DESIGN.md pair
+  second-brain drew from its maintainer's wiki, the light one and its dark twin.
 
 ### Host your own copy
 
@@ -151,9 +151,7 @@ It's served by GitHub Pages from this repository (`.github/workflows/pages.yml`)
 To host your own copy, publish `web/` anywhere with HTTPS; the page has no build
 step and loads nothing from other sites. Change the link-preview URLs at the top
 of `web/index.html` to your address; the preview image is `web/icons/og.png`,
-rendered from `og.html` next to it. The deploy copies `docs/readme/flow.svg`
-into the page for the welcome; a copy without it hides the animation. The local
-inbox isn't supported: a page
+drawn by `docs/readme/build_social.py`. The local inbox isn't supported: a page
 served over HTTPS can't call `http://<mac>.local`.
 
 ## Keywords in the note
