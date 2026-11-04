@@ -62,9 +62,10 @@ python -m worker.design_md --no-model                           # template prose
 
 The output passes `npx @google/design.md lint` with no errors or warnings. What
 it looks like, from the synthetic test wiki: [taste](examples/DESIGN.taste.md)
-and [a style](examples/DESIGN.style-paper-ink.md). The image at the top of the
-README is built from the same test wiki and styled with that style's DESIGN.md:
-`python docs/readme/build_flow.py`.
+and [a style](examples/DESIGN.style-paper-ink.md). The capture page and the
+animation at the top of the README wear the pair drawn from a real wiki, its
+maintainer's: `python docs/readme/build_flow.py` draws the animation in the
+page's tokens.
 
 ## AGENTS.md
 
