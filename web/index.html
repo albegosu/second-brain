@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https:; img-src 'self' blob: data:; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#f3ede1" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1b1915" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Share a link, a post or an image from Android or any browser. A vision model files it into your private wiki.">
 <title>Save to second-brain</title>
@@ -29,10 +29,35 @@
 <script src="app.js" defer></script>
 </head>
 <body>
+<!-- The welcome's backdrop: the kind of thing people save, drifting at different depths. -->
+<div class="drift" aria-hidden="true">
+  <div class="cap c1"><div class="art a-gradient"><i></i><i></i><i></i></div><p>Liquid gradient<span>Visual style</span></p></div>
+  <div class="cap c2"><div class="art a-menu"><i></i><i></i><i></i><i></i></div><p>Morphing menu<span>Pattern</span></p></div>
+  <div class="cap c3"><div class="art a-bento"><i></i><i></i><i></i><i></i><i></i></div><p>Bento dashboard<span>Visual style</span></p></div>
+  <div class="cap c4"><div class="art a-dither"></div><p>Pixel morph<span>Visual style</span></p></div>
+  <div class="cap c5"><div class="art a-chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p>Latency waterfall<span>Feature</span></p></div>
+  <div class="cap c6"><div class="art a-type">Aa</div><p>Geometric sans<span>Visual style</span></p></div>
+  <div class="cap c7"><div class="art a-swatches"><i></i><i></i><i></i><i></i><i></i></div><p>Warm palette<span>Visual style</span></p></div>
+  <div class="cap c8"><div class="art a-cmdk"><b></b><i></i><i></i><i></i></div><p>Command palette<span>Tool</span></p></div>
+  <div class="cap c9"><div class="art a-radar"><i></i><b></b></div><p>Radar alerts<span>Pattern</span></p></div>
+  <div class="cap c10"><div class="art a-ascii">░▒▓█▓▒░ ▒▓█▓▒ ░▒▓▒░<br>▓█▓▒░ ░▒▓█▓▒░ ▒▓█<br>░▒▓█▓▒░ ▒▓█▓▒ ░▒▓▒░</div><p>ASCII fusion<span>Visual style</span></p></div>
+  <div class="cap c11"><div class="art a-gradient alt"><i></i><i></i><i></i></div><p>Aurora card<span>Visual style</span></p></div>
+</div>
+<button type="button" class="motion only-welcome" id="motion" aria-pressed="false" aria-label="Pause motion" title="Pause motion"></button>
+<div class="bar">
+  <a class="mark" href="./"><img src="icons/icon.svg" alt="" width="24" height="24"><span>second-brain</span></a>
+  <div class="bar-end">
+    <a class="secondary pill only-welcome" href="https://github.com/albegosu/second-brain">GitHub</a>
+    <div id="footer" hidden>
+      <button type="button" class="secondary pill" id="toggle-settings">Settings</button>
+    </div>
+  </div>
+</div>
 <main>
   <header>
-    <p class="brand">second-brain</p>
+    <a class="badge only-welcome" href="https://github.com/albegosu/second-brain#what-you-get"><b>New</b><span>Collections, each with a DESIGN.md</span></a>
     <h1 id="title" tabindex="-1">Save</h1>
+    <p class="inbox" id="inbox" hidden></p>
   </header>
 
   <aside class="install" id="install-banner" hidden>
@@ -42,16 +67,124 @@
 
   <!-- A first visit: no settings yet, and the page wasn't opened to connect or to save something. -->
   <section class="welcome" id="welcome" hidden>
-    <p class="lead">Share a link, a post or a screenshot from any app. A vision model files it into your private wiki. Then your coding agent builds with your DESIGN.md: your taste, drawn from what you saved.</p>
-    <!-- docs/readme/flow.svg, copied here when the page is deployed (.github/workflows/pages.yml). -->
-    <figure class="flow" id="flow">
-      <img id="flow-img" src="flow.svg" width="1280" height="720" loading="lazy" decoding="async" alt="The flow, animated: something shared from a phone is filed into a wiki, the wiki becomes a DESIGN.md, and a coding agent builds with it.">
-    </figure>
-    <div class="actions">
-      <a class="primary" href="https://github.com/albegosu/second-brain#quick-start">Set it up</a>
-      <button type="button" class="secondary" id="have-setup">I already ran bin/setup</button>
+    <div class="hero">
+      <p class="lead">Share a link, a post or a screenshot from any app. A vision model files it into your private wiki. Then your coding agent builds with your DESIGN.md: your taste, drawn from what you saved.</p>
+      <div class="actions">
+        <a class="primary" href="https://github.com/albegosu/second-brain#quick-start">Set it up</a>
+        <button type="button" class="secondary" id="have-setup">I already ran bin/setup</button>
+      </div>
     </div>
-    <p class="muted">Open source, and this page has no server: the settings stay in this browser and each capture goes straight to your own inbox.</p>
+
+    <section class="part" aria-labelledby="why">
+      <p class="eyebrow">01 · Why</p>
+      <h2 class="display reveal" id="why">Bookmarks go to die. <span>Yours go to a wiki your agent reads.</span></h2>
+      <div class="bento">
+        <article class="cell wide reveal">
+          <div class="demo toasts" aria-hidden="true">
+            <div class="toast"><b class="src">X</b><p>Morphing menu<span>Saved from X · just now</span></p></div>
+            <div class="toast"><b class="src">IG</b><p>Bento dashboard<span>Saved from Instagram · just now</span></p></div>
+            <div class="toast"><b class="src">in</b><p>Agent trace waterfall<span>Saved from LinkedIn · just now</span></p></div>
+          </div>
+          <h3>Share from any app</h3>
+          <p>From the Share menu on iPhone, Android or any browser: a link, a post or a screenshot. Nothing else to open.</p>
+        </article>
+        <article class="cell wide reveal">
+          <div class="demo tree" aria-hidden="true">
+            <p class="dir">wiki/</p>
+            <p class="dir in1">design/</p>
+            <p class="in2">style-dark-bento.md</p>
+            <p class="in2 new">menus.md <span>+ Morphing menu</span></p>
+            <p class="dir in1">features/</p>
+            <p class="dir in1">tools/</p>
+            <p class="dir in1">practices/</p>
+          </div>
+          <h3>Filed by a vision model</h3>
+          <p>It looks at the frames, names what it sees and files it under design, features, tools or practices, sources and all.</p>
+        </article>
+        <article class="cell reveal">
+          <div class="demo tokens" aria-hidden="true">
+            <div class="swatches"><i></i><i></i><i></i><i></i><i></i></div>
+            <code>radius: 10px<br>depth: flat<br>motion: smooth</code>
+          </div>
+          <h3>Your taste, as a DESIGN.md</h3>
+          <p>Colors, type, radius and motion, drawn from what you saved. This page wears the one drawn from its maintainer's wiki.</p>
+        </article>
+        <article class="cell reveal">
+          <div class="demo folders" aria-hidden="true">
+            <span>Side project</span><span>Client work</span><span>Portfolio</span>
+          </div>
+          <h3>Collections</h3>
+          <p>One per project or client, each with its own DESIGN.md.</p>
+        </article>
+        <article class="cell reveal">
+          <div class="demo agents" aria-hidden="true">
+            <div class="chips"><span>Claude Code</span><span>Cursor</span><span>Codex</span><span>+4</span></div>
+            <code><b>$</b> bin/connect <i>✓ connected</i></code>
+          </div>
+          <h3>Read by your agent</h3>
+          <p>It builds from the summary, with the sources a click away.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="part" aria-labelledby="loop">
+      <p class="eyebrow">02 · How it works</p>
+      <h2 class="display reveal" id="loop">From a share <span>to a build.</span></h2>
+      <ol class="pipeline reveal">
+        <li class="stage s1">
+          <div class="scene share" aria-hidden="true">
+            <div class="shot a"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="sheet b"><i></i><i></i><i class="me"></i><i></i></div>
+            <b class="saved d">Saved ✓</b>
+          </div>
+          <h3><b>01</b>Share</h3>
+          <p>From any app's Share menu: a link, a post or a screenshot.</p>
+        </li>
+        <li class="stage s2">
+          <div class="scene radar" aria-hidden="true">
+            <div class="scope"><i class="sweep"></i><b class="blip a"></b><b class="blip b"></b><b class="blip c"></b></div>
+            <p class="hits"><span class="a">nav</span><span class="b">card</span><span class="c">motion</span><span class="d">→ design/menus.md</span></p>
+          </div>
+          <h3><b>02</b>Read</h3>
+          <p>A vision model reads the frames and files the capture under its topic.</p>
+        </li>
+        <li class="stage s3">
+          <div class="scene distill" aria-hidden="true">
+            <p class="file a">DESIGN.md <span>taste</span></p>
+            <p class="ln b">primary <i class="sw p"></i></p>
+            <p class="ln c">tertiary <i class="sw t"></i></p>
+            <p class="ln d">radius <b>10px</b></p>
+            <p class="ln e">depth <b>flat</b></p>
+            <p class="ln e">type <b>geometric sans</b></p>
+          </div>
+          <h3><b>03</b>Distill</h3>
+          <p>What you keep saving becomes design tokens: your taste, written down.</p>
+        </li>
+        <li class="stage s4">
+          <div class="scene build" aria-hidden="true">
+            <p class="prompt a"><b>›</b> build a settings card</p>
+            <div class="ui b">
+              <i></i>
+              <div class="ui-row c"><i></i><b></b></div>
+              <div class="ui-row d"><i class="short"></i><b class="off"></b></div>
+              <span class="btn e">Save</span>
+            </div>
+          </div>
+          <h3><b>04</b>Build</h3>
+          <p>Your coding agent builds with it, the sources a click away.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="part outro reveal" aria-labelledby="start">
+      <p class="eyebrow">03 · Start</p>
+      <h2 class="display" id="start">Set it up once. <span>Then just share.</span></h2>
+      <div class="actions">
+        <a class="primary" href="https://github.com/albegosu/second-brain#quick-start">Set it up</a>
+        <a class="secondary" href="https://github.com/albegosu/second-brain">Read the code</a>
+      </div>
+      <p class="muted">Open source, and this page has no server: the settings stay in this browser and each capture goes straight to your own inbox.</p>
+    </section>
   </section>
 
   <form id="capture" novalidate hidden>
@@ -146,9 +279,6 @@
     </section>
   </form>
 
-  <footer id="footer" hidden>
-    <button type="button" class="link" id="toggle-settings">Settings</button>
-  </footer>
 </main>
 </body>
 </html>

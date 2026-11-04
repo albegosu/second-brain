@@ -13,6 +13,7 @@ const INTENTS = ["Pattern to reuse", "Visual style", "Tool to try", "Idea to rea
 const DEFAULT_INTENT = "Just save";
 const SETTINGS = "second-brain:settings";
 const QUEUE = "second-brain:queue";
+const STILL = "second-brain:still";        // the welcome's motion, paused by its button
 const SHARE_CACHE = "second-brain-share";  // where sw.js keeps an Android share
 const POPUP = "second-brain-popup";        // window name the bookmarklet opens
 const MAX_SIDE = 2560;                     // px; plenty for the analysis, keeps uploads small
@@ -20,7 +21,7 @@ const JPEG_QUALITY = 0.85;
 const MAX_BASE64 = 12000000;               // capture_image's limit
 const INBOX_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const ITEM_ERRORS = /invalid url|invalid image|unsupported image type/i;  // retrying won't help
-const HEADLINE = "Save what catches your eye. Build with it.";  // the welcome's title
+const HEADLINE = ["Save what catches your eye.", "Build with it."];  // the welcome's title; the second line is set in the accent
 const SEND_LABEL = "Save to second-brain";
 const BROKEN_LINK = "That setup link didn't work: it may be cut short. Scan the QR code again, or paste the whole link.";
 
@@ -361,6 +362,7 @@ function show(screen) {
   document.body.dataset.screen = screen;
   for (const id of ["welcome", "capture", "settings"]) $(id).hidden = id !== screen;
   $("footer").hidden = screen === "welcome";
+  $("inbox").hidden = true;  // shown again by showCapture
   renderInstall();
 }
 
@@ -372,14 +374,43 @@ function focusTitle() {
 
 function showWelcome() {
   show("welcome");
-  $("title").textContent = HEADLINE;
+  const [lead, accent] = HEADLINE;
+  const em = document.createElement("em");
+  em.textContent = accent;
+  $("title").replaceChildren(`${lead} `, em);
 }
 
 function showCapture() {
   show("capture");
   $("title").textContent = "Save";
   $("toggle-settings").textContent = "Settings";
+  renderInbox();
   renderQueue();
+}
+
+// Under the title: where a capture from this device goes.
+function renderInbox() {
+  let where = "";
+  if (settings?.kind === "github") where = settings.repo;
+  else if (settings) where = new URL(settings.url).host;
+  $("inbox").textContent = where;
+  $("inbox").title = where ? `Captures go to ${where}` : "";
+  $("inbox").hidden = !where;
+}
+
+// The welcome moves on its own: its button pauses that, and the choice is kept.
+function bindMotion() {
+  const button = $("motion");
+  const set = (still) => {
+    document.body.classList.toggle("still", still);
+    button.setAttribute("aria-pressed", String(still));
+  };
+  set(load(STILL, false));
+  button.addEventListener("click", () => {
+    const still = !document.body.classList.contains("still");
+    set(still);
+    save(STILL, still);
+  });
 }
 
 function showSettings() {
@@ -633,15 +664,6 @@ function renderInstall() {
   $("install-banner").hidden = !installPrompt || document.body.dataset.screen === "welcome";
 }
 
-// The welcome's animation is docs/readme/flow.svg, copied next to the page when
-// it's deployed. Where it's missing (a local copy of web/), the figure goes away.
-function watchFlow() {
-  const img = $("flow-img");
-  const hide = () => ($("flow").hidden = true);
-  img.addEventListener("error", hide);
-  if (img.complete && !img.naturalWidth) hide();  // failed before this ran
-}
-
 function installed() {
   return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
@@ -650,7 +672,7 @@ async function start() {
   settings = normalize(load(SETTINGS, null));
   renderIntents();
   bind();
-  watchFlow();
+  bindMotion();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
   const setupHash = /^#setup=/.test(location.hash);
