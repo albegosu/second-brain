@@ -1,35 +1,77 @@
-/* Tokens from docs/examples/DESIGN.style-paper-ink.md, a DESIGN.md second-brain
-   generated: warm paper, black ink, one hot accent, square corners, no shadows.
+/* The capture page, worn in a taste second-brain drew from a real wiki: the
+   DESIGN.md pair ("Taste" and "Taste (dark)") generated from its maintainer's 133
+   design captures. That fixes the voice: a geometric sans at 600 for headlines,
+   10px corners on controls and 16px on cards, round chips, comfortable spacing,
+   flat layers told apart by a surface step and a 1px outline (no shadows), and
+   smooth motion that never bounces. The texture comes from the same wiki's taste
+   notes: high-contrast grids, micrographic labels and a radar.
 
-   The dark theme is not in that DESIGN.md: its values are derived here. A warm
-   near-black ground, paper-colored text, the same hot accent and a lighter blue.
-   WCAG contrast, dark: on-surface 15.1:1 on neutral and 13.4:1 on surface,
-   secondary 6.1:1 and 5.4:1, on-primary 4.9:1 on primary, on-tertiary 8.1:1 on
-   tertiary, and the focus outline (tertiary) 8.1:1 on neutral and 7.2:1 on surface. */
+   The welcome is a landing page: saved things drifting at different depths around
+   the title, a bento of what it does, and the loop from a share to a build drawn in
+   these tokens. The capture and settings forms sit in one card.
+
+   Tokens are the DESIGN.md's, light in :root and dark below. Two are derived here:
+   muted (small muted text) and quiet (the second, softer line of a big heading),
+   because the measured secondary sits next to on-surface (light: #636364 against
+   #646466; dark: #e3e3e3 against #fcfcfc) and wouldn't read as softer.
+
+   WCAG contrast, light: on-surface 5.3:1 on neutral and 4.6:1 on surface, muted
+   (= secondary) 5.4:1 and 4.6:1, quiet 3.1:1 (large text only), on-primary 4.5:1
+   on primary, on-tertiary 5.4:1, focus ring (primary) 4.5:1 and 3.9:1. Dark:
+   on-surface 18.0:1 and 15.9:1, muted 5.5:1 and 4.8:1, quiet 3.6:1 (large text
+   only), on-primary 6.8:1, on-tertiary 6.6:1, focus ring 6.8:1. Field edges are a
+   hairline over a fill, below 3:1; the focus ring is not. */
 :root {
-  --primary: #d9481f;
-  --on-primary: #000000;
-  --secondary: #6b655b;
-  --tertiary: #2d5b8a;
-  --on-tertiary: #f3ede1;
-  --neutral: #f3ede1;
-  --surface: #ebe3d3;
-  --on-surface: #211e1a;
-  --outline: #cdc8bd;
-  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
-  --sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --primary: #2e61f8;
+  --on-primary: #f3f3f3;
+  --secondary: #636364;
+  --tertiary: #d45c49;
+  --on-tertiary: #000000;
+  --neutral: #f3f3f3;
+  --surface: #fedcc3;
+  --on-surface: #646466;
+  --outline: #d9d9da;
+  --muted: #636364;
+  --quiet: #8a8a8b;
+  --raised: #e8e8e9;
+  --panel: var(--surface);  /* resolved here, so a card that redefines --surface keeps it */
+  --ok: #1f8a4c;
+  --danger: #d45c49;
+  --on-danger: #000000;
+  --grid: rgb(100 100 102 / 0.13);
+  /* Only inside the drawn pictures of saved things: the taste's accent hues
+     (orange, blue, red, cyan), the same in both themes, as a screenshot would be. */
+  --ink: #141414;
+  --ink-cell: #262626;
+  --hot: #ec810c;
+  --blue: #2e61f8;
+  --red: #d45c49;
+  --cyan: #26b5c4;
+  --green: #3fbf74;
+  --sans: "DM Sans", "Avenir Next", Futura, ui-sans-serif, system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.25, 0.6, 0.3, 1);  /* smooth: a long, soft ease-out */
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --secondary: #9f978a;
-    --tertiary: #8fb3dc;
-    --on-tertiary: #1b1915;
-    --neutral: #1b1915;
-    --surface: #26231e;
-    --on-surface: #f3ede1;
-    --outline: #433e36;
+    --primary: #ec810c;
+    --on-primary: #141414;
+    --secondary: #e3e3e3;
+    --tertiary: #2450cc;
+    --on-tertiary: #fcfcfc;
+    --neutral: #141414;
+    --surface: #202020;
+    --on-surface: #fcfcfc;
+    --outline: #333333;
+    --muted: #8c8c8c;
+    --quiet: #6e6e6e;
+    --raised: #2a2a2a;
+    --ok: #4ade80;
+    --danger: #e5533d;
+    --on-danger: #141414;
+    --grid: rgb(255 255 255 / 0.07);
   }
 }
 
@@ -41,49 +83,154 @@ body {
   margin: 0;
   background: var(--neutral);
   color: var(--on-surface);
-  font: 400 16px/1.6 var(--serif);
+  font: 400 16px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 main {
-  max-width: 34rem;
+  max-width: 36rem;
   margin: 0 auto;
-  padding: max(40px, env(safe-area-inset-top)) 24px max(40px, env(safe-area-inset-bottom));
+  padding: 8px 24px max(56px, env(safe-area-inset-bottom));
 }
 
-header { margin-bottom: 40px; }
-.brand, h2, .kind {
-  margin: 0 0 8px;
-  font: 500 12px/1.2 var(--sans);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--secondary);
+/* A fine grid behind the top of every screen, fading out. */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: min(80vh, 640px);
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) 50% 0 / 48px 48px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 50% 0 / 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 100% at 50% 0, #000, transparent 75%);
+  mask-image: radial-gradient(ellipse 60% 100% at 50% 0, #000, transparent 75%);
+  pointer-events: none;
 }
-h1 { margin: 0; font: 500 32px/1.2 var(--serif); letter-spacing: -0.01em; }
+
+/* --- The top bar: the mark, and what to do next ------------------------------ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 24px 0;
+  min-height: 64px;
+}
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--on-surface);
+  font: 600 15px/1 var(--sans);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.mark img { display: block; width: 24px; height: 24px; border-radius: 6px; }
+.bar-end { display: flex; align-items: center; gap: 8px; }
+body:not([data-screen="welcome"]) .only-welcome { display: none; }
+
+/* --- Titles ------------------------------------------------------------------ */
+
+main > header { margin: 40px 0 32px; text-align: center; }
+h1 {
+  margin: 0;
+  font: 600 clamp(30px, 6vw, 36px)/1.1 var(--sans);
+  letter-spacing: -0.02em;
+}
 h1:focus { outline: none; }  /* focused only to move a screen reader to the new screen */
-h2 { margin: 40px 0 12px; }
+h1 em { display: block; color: var(--primary); font-style: normal; }  /* the welcome's second line */
+h2 { margin: 36px 0 12px; color: var(--muted); font: 500 13px/1.2 var(--sans); letter-spacing: 0.01em; }
 p { margin: 0; }
-code { font: 0.9em ui-monospace, Menlo, Consolas, monospace; }
+code { font: 0.9em var(--mono); }
 
-form { display: grid; gap: 24px; }
+/* Under the title on the capture screen: where captures from this device go. */
+.inbox {
+  display: inline-block;
+  max-width: 100%;
+  margin: 14px 0 0;
+  padding: 6px 12px 6px 10px;
+  overflow: hidden;
+  border: 1px solid var(--outline);
+  border-radius: 9999px;
+  color: var(--muted);
+  font: 12px/1.2 var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+.inbox::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 8px 1px 0;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+/* Capture and settings: one card, the fields set into it. */
+#capture, #settings {
+  --surface: var(--neutral);  /* what's filled inside the card is the page color */
+  padding: 24px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+/* --- Fields ------------------------------------------------------------------ */
+
+form { display: grid; gap: 28px; }
 .field { display: grid; gap: 8px; }
-.field > span, legend { font: 500 14px/1.2 var(--sans); letter-spacing: 0.01em; }
-.link-input { display: grid; gap: 12px; }
-.group { display: grid; gap: 24px; }
+.field > span, legend { color: var(--muted); font: 500 13px/1.2 var(--sans); letter-spacing: 0.01em; }
+.link-input { display: grid; gap: 14px; }
+.group { display: grid; gap: 20px; }
 
 input[type="url"], input[type="text"], input[type="password"], textarea {
   width: 100%;
-  min-height: 48px;
-  padding: 12px;
+  min-height: 44px;
+  padding: 10px 14px;
   border: 1px solid var(--outline);
-  border-radius: 0;
-  background: var(--neutral);
+  border-radius: 10px;
+  background: var(--surface);
   color: var(--on-surface);
-  font: 400 16px/1.5 var(--serif);
+  font: 400 16px/1.5 var(--sans);
+  transition: border-color 160ms ease-out;
 }
-textarea { resize: vertical; }
-::placeholder { color: var(--secondary); opacity: 1; }
+input:hover, textarea:hover { border-color: var(--quiet); }
+textarea { min-height: 104px; padding: 12px 14px; resize: vertical; }
+::placeholder { color: var(--muted); opacity: 1; }
 
-/* --- Choices: what caught your eye, and the kind of inbox ------------------- */
+/* The link: the one thing this page asks for, with a link icon. */
+.link-input .field { position: relative; }
+.link-input .field > span {  /* still the input's label, for a screen reader */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.link-input input[type="url"] { min-height: 52px; padding: 0 16px 0 46px; }
+.link-input .field::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+  background: var(--muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+.link-input .muted { text-align: center; }
+
+/* --- Choices: what caught your eye, and the kind of inbox -------------------- */
 
 fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 legend { padding: 0; margin-bottom: 12px; }
@@ -93,38 +240,42 @@ legend { padding: 0; margin-bottom: 12px; }
 .options span {
   display: flex;
   align-items: center;
-  width: 100%;
-  min-height: 44px;  /* a thumb-sized target */
-  padding: 10px 16px;
+  min-height: 40px;  /* a thumb-sized target */
+  padding: 0 16px;
   border: 1px solid var(--outline);
+  border-radius: 9999px;
   background: var(--surface);
   font: 500 14px/1.2 var(--sans);
-  transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+  letter-spacing: 0.01em;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
 }
-.options label:hover span { border-color: var(--secondary); }
-.options input:checked + span { background: var(--tertiary); border-color: var(--tertiary); color: var(--on-tertiary); }
-/* Six intents in an even grid: two columns on a phone, three on a wider screen. */
-#intents { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+.options label:hover span { border-color: var(--quiet); }
+.options input:checked + span { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 
-/* --- Buttons and links ------------------------------------------------------ */
+/* --- Buttons and links ------------------------------------------------------- */
 
-button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01em; cursor: pointer; }
+button { font: 500 14px/1.2 var(--sans); cursor: pointer; }
 .primary, .secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 48px;
-  padding: 0 24px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
   font: 500 14px/1.2 var(--sans);
   letter-spacing: 0.01em;
   text-decoration: none;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, opacity 160ms ease-out;
 }
-.primary { border: 0; background: var(--primary); color: var(--on-primary); }
+.primary { border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); }
+.primary:hover { opacity: 0.9; }
 .primary:disabled { opacity: 0.6; cursor: progress; }
 .secondary { border: 1px solid var(--outline); background: var(--surface); color: var(--on-surface); justify-self: start; }
-.secondary:hover { border-color: var(--secondary); }
+.secondary:hover { border-color: var(--quiet); }
 .secondary:disabled { cursor: progress; }
+.pill { min-height: 36px; padding: 0 14px; font-size: 13px; justify-self: auto; }
+form .primary { min-height: 48px; font-size: 15px; }
 .link {
   padding: 0;
   border: 0;
@@ -132,12 +283,15 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
   color: var(--on-surface);
   font: inherit;
   text-decoration: underline;
+  text-decoration-color: var(--quiet);
   text-underline-offset: 3px;
   cursor: pointer;
 }
+.link:hover { text-decoration-color: currentColor; }
 .chip {
   display: inline-block;
-  padding: 8px;
+  padding: 6px 12px;
+  border-radius: 9999px;
   background: var(--tertiary);
   color: var(--on-tertiary);
   font: 500 12px/1.2 var(--sans);
@@ -146,30 +300,579 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
   cursor: grab;
 }
 
-:focus-visible, .options input:focus-visible + span { outline: 2px solid var(--tertiary); outline-offset: 2px; }
+:focus-visible, .options input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-/* Sending: the button stays solid and three squares pulse in turn. */
+/* Sending: the button stays solid and three dots pulse in turn. */
 .primary[aria-busy="true"] { opacity: 1; }
 .dots { display: none; gap: 4px; }
 [aria-busy="true"] > .dots { display: inline-flex; }
-.dots i { width: 6px; height: 6px; background: currentColor; animation: pulse 900ms ease-in-out infinite; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 900ms ease-in-out infinite; }
 .dots i:nth-child(2) { animation-delay: 150ms; }
 .dots i:nth-child(3) { animation-delay: 300ms; }
 @keyframes pulse { 0%, 70%, 100% { opacity: 0.25; } 35% { opacity: 1; } }
 
-/* --- Welcome ---------------------------------------------------------------- */
+/* --- Welcome: the first screen ------------------------------------------------ */
 
-[data-screen="welcome"] h1 { font-size: clamp(32px, 7.5vw, 44px); line-height: 1.1; }
-.welcome { display: grid; gap: 32px; }
-.lead { font: 400 18px/1.6 var(--serif); }
-.flow { margin: 0; border: 1px solid var(--outline); background: var(--surface); }
-.flow img { display: block; width: 100%; height: auto; }
-.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+[data-screen="welcome"] main { max-width: 70rem; }
+/* The first screen fills the viewport, words a little above the middle, so the
+   drift behind it (one viewport tall) never reaches the sections below. 440px is
+   about the bar plus the words on a desktop. */
+[data-screen="welcome"] { --hero-pad: max(64px, (100svh - 440px) / 2); }
+[data-screen="welcome"] main > header { margin: calc(var(--hero-pad) * 0.9) 0 28px; }
+[data-screen="welcome"] h1 { font-size: clamp(40px, 7.4vw, 64px); line-height: 1.05; letter-spacing: -0.03em; }
+.welcome { display: grid; gap: clamp(88px, 11vw, 140px); }
+.hero { display: grid; justify-items: center; gap: 32px; padding-bottom: calc(var(--hero-pad) * 1.1); text-align: center; }
+.lead { max-width: 34rem; color: var(--muted); font: 400 18px/1.5 var(--sans); }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
-/* --- What was shared, the install banner ------------------------------------ */
+/* The words come in first, a beat apart. */
+[data-screen="welcome"] main > header > *, .hero > * { animation: rise-in 800ms var(--ease) both; }
+[data-screen="welcome"] main > header > h1 { animation-delay: 80ms; }
+.hero .lead { animation-delay: 180ms; }
+.hero .actions { animation-delay: 280ms; }
+@keyframes rise-in { from { opacity: 0; translate: 0 12px; } }
 
-.shared { display: grid; gap: 12px; padding: 24px; border: 1px solid var(--outline); background: var(--surface); }
-.shared img { display: block; max-width: 100%; max-height: 50vh; margin: 0 auto; }
+/* What's new, above the title, with the DESIGN.md's chip. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-bottom: 26px;
+  padding: 4px 14px 4px 4px;
+  border: 1px solid var(--outline);
+  border-radius: 9999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 500 13px/1.2 var(--sans);
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: border-color 160ms ease-out, color 160ms ease-out;
+}
+.badge b { flex: none; padding: 4px 10px; border-radius: 9999px; background: var(--tertiary); color: var(--on-tertiary); font-size: 12px; font-weight: 600; }
+.badge span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.badge::after { content: "→"; color: var(--on-surface); transition: translate 200ms var(--ease); }
+.badge:hover { border-color: var(--quiet); color: var(--on-surface); }
+.badge:hover::after { translate: 3px 0; }
+
+/* Micrographic labels over each section: a number, a name and a short rule. */
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 -16px;
+  color: var(--muted);
+  font: 500 12px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.eyebrow::before { content: ""; width: 20px; height: 2px; background: var(--primary); }
+
+/* --- The drift: saved things floating around the title ------------------------
+   Near cards are large and sharp, far ones small, faint and out of focus: depth
+   without a shadow. The middle is kept clear for the words, and the field fades
+   into the page below. */
+
+.drift {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: max(100svh, 640px);
+  overflow: hidden;
+  pointer-events: none;
+}
+body:not([data-screen="welcome"]) .drift { display: none; }
+.drift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 36% 40% at 50% 50%, var(--neutral) 40%, transparent),
+    linear-gradient(to bottom, transparent 64%, var(--neutral));
+}
+.cap {
+  --s: 1; --b: 0px; --o: 1; --r: 0deg; --d: 10s; --fx: 6px; --fy: -16px; --in: 0ms;
+  position: absolute;
+  width: 220px;
+  padding: 7px 7px 12px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: var(--surface);
+  scale: var(--s);
+  rotate: var(--r);
+  opacity: var(--o);
+  filter: blur(var(--b));
+  animation: cap-in 1400ms var(--ease) var(--in) both, float var(--d) ease-in-out infinite alternate;
+}
+.cap p { margin: 10px 5px 0; font: 600 13px/1.25 var(--sans); text-align: left; }
+.cap p span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: 0.01em; }
+@keyframes cap-in { from { opacity: 0; translate: 0 24px; } }
+@keyframes float { from { translate: 0 0; } to { translate: var(--fx) var(--fy); } }
+
+.c1  { left: -2%;  top: 13%; --r: -4deg; --d: 11s; --fy: -18px; }
+.c2  { left: 15%;  top: 2%;  --s: 0.7;  --b: 3px;   --o: 0.55; --r: 3deg;  --d: 13s; --in: 200ms; }
+.c3  { left: 2%;   top: 50%; --s: 1.04; --r: 2deg;  --d: 10s; --fy: 16px; --in: 120ms; }
+.c4  { left: 18%;  top: 73%; --s: 0.8;  --b: 1.5px; --o: 0.75; --r: -3deg; --d: 12s; --in: 260ms; }
+.c5  { left: -4%;  top: 84%; --s: 0.68; --b: 4px;   --o: 0.45; --d: 14s; --in: 340ms; }
+.c6  { right: -1%; top: 11%; --r: 4deg;  --d: 10.5s; --fx: -8px; --in: 60ms; }
+.c7  { right: 17%; top: 2%;  --s: 0.68; --b: 3.5px; --o: 0.5;  --r: -2deg; --d: 13.5s; --in: 220ms; }
+.c8  { right: 4%;  top: 49%; --s: 1.02; --r: -3deg; --d: 9.5s; --fy: 14px; --in: 160ms; }
+.c9  { right: 19%; top: 75%; --s: 0.78; --b: 1.5px; --o: 0.75; --r: 3deg;  --d: 12.5s; --in: 300ms; }
+.c10 { left: 41%;  top: 90%; --s: 0.66; --b: 4px;   --o: 0.4;  --d: 15s; --in: 380ms; }
+.c11 { left: 45%;  top: -9%; --s: 0.6;  --b: 5px;   --o: 0.35; --d: 16s; --in: 400ms; }
+
+/* Each card's picture, drawn in CSS: the kinds of things people save. */
+.art { position: relative; height: 124px; overflow: hidden; border-radius: 10px; background: var(--neutral); }
+.art i, .art b { display: block; }
+
+.a-gradient { background: var(--ink); }
+.a-gradient i { position: absolute; width: 96px; height: 96px; border-radius: 50%; filter: blur(20px); animation: blob 7s ease-in-out infinite alternate; }
+.a-gradient i:nth-child(1) { left: 6px; top: 26px; background: var(--hot); }
+.a-gradient i:nth-child(2) { left: 70px; top: 44px; background: var(--red); animation-delay: -2s; }
+.a-gradient i:nth-child(3) { left: 118px; top: -6px; background: var(--blue); animation-delay: -4s; }
+.a-gradient.alt i:nth-child(1) { background: var(--cyan); }
+.a-gradient.alt i:nth-child(2) { background: var(--blue); }
+.a-gradient.alt i:nth-child(3) { background: var(--hot); }
+@keyframes blob { to { translate: 26px -14px; scale: 1.2; } }
+
+.a-menu { display: flex; justify-content: center; gap: 6px; padding-top: 20px; }
+.a-menu i { width: 38px; height: 22px; border-radius: 9999px; background: var(--outline); }
+.a-menu i:nth-child(2) { background: var(--on-surface); }
+.a-menu::after {
+  content: "";
+  position: absolute;
+  left: 60px;
+  top: 52px;
+  width: 112px;
+  height: 58px;
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+  background:
+    linear-gradient(var(--outline) 0 0) 12px 13px / 64px 6px no-repeat,
+    linear-gradient(var(--outline) 0 0) 12px 26px / 46px 6px no-repeat,
+    linear-gradient(var(--hot) 0 0) 12px 39px / 56px 6px no-repeat,
+    var(--surface);
+  transform-origin: 30% 0;
+  animation: menu 3.2s var(--ease) infinite;
+}
+@keyframes menu { 0%, 8% { opacity: 0; scale: 0.6 0.3; } 24%, 78% { opacity: 1; scale: 1; } 92%, 100% { opacity: 0; scale: 0.6 0.3; } }
+
+.a-bento { display: grid; grid-template: 1fr 1fr / 1.6fr 1fr 1fr; gap: 5px; padding: 7px; background: var(--ink); }
+.a-bento i { border-radius: 6px; background: var(--ink-cell); }
+.a-bento i:nth-child(1) { grid-row: span 2; background: linear-gradient(160deg, var(--blue), #2450cc); }
+.a-bento i:nth-child(2) { background: linear-gradient(var(--cyan) 0 0) 8px 70% / 40% 5px no-repeat, var(--ink-cell); }
+.a-bento i:nth-child(4) { grid-column: span 2; background: linear-gradient(90deg, var(--hot) 0 62%, transparent 0) 8px 50% / calc(100% - 16px) 6px no-repeat, var(--ink-cell); }
+
+/* A pixel picture that keeps rearranging: the taste's "pixel-morph". */
+.a-dither { background: #f3f3f3; }
+.a-dither::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    conic-gradient(var(--ink) 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0) 0 0 / 12px 12px;
+  -webkit-mask: radial-gradient(closest-side, #000, transparent) 0 0 / 70% 150% no-repeat;
+  mask: radial-gradient(closest-side, #000, transparent) 0 0 / 70% 150% no-repeat;
+  animation: dither 6s ease-in-out infinite alternate;
+}
+@keyframes dither { to { -webkit-mask-position: 100% 100%; mask-position: 100% 100%; } }
+
+.a-chart { display: grid; align-content: center; gap: 6px; padding: 12px 14px; background: var(--ink); }
+.a-chart i { height: 8px; border-radius: 4px; background: var(--blue); }
+.a-chart i:nth-child(1) { width: 34%; }
+.a-chart i:nth-child(2) { width: 22%; margin-left: 30%; background: var(--cyan); }
+.a-chart i:nth-child(3) { width: 44%; margin-left: 50%; }
+.a-chart i:nth-child(4) { width: 18%; margin-left: 12%; background: var(--green); }
+.a-chart i:nth-child(5) { width: 30%; margin-left: 28%; }
+.a-chart i:nth-child(6) { width: 16%; margin-left: 60%; background: var(--hot); }
+.a-chart i:nth-child(7) { width: 26%; margin-left: 70%; background: var(--red); }
+
+.a-type { display: grid; place-items: center; background: #fedcc3; color: #3a3a3c; font: 600 68px/1 var(--sans); letter-spacing: -0.04em; }
+.a-type::after { content: ""; position: absolute; left: 50%; bottom: 20px; width: 64px; height: 3px; translate: -50% 0; background: var(--hot); }
+
+.a-swatches { display: flex; }
+.a-swatches i { flex: 1; }
+.a-swatches i:nth-child(1) { background: #f3f3f3; }
+.a-swatches i:nth-child(2) { background: #fedcc3; }
+.a-swatches i:nth-child(3) { background: #ec810c; }
+.a-swatches i:nth-child(4) { background: #d45c49; }
+.a-swatches i:nth-child(5) { background: #2450cc; }
+
+.a-cmdk { display: grid; align-content: start; gap: 6px; padding: 12px; background: var(--ink); }
+.a-cmdk b { height: 26px; margin-bottom: 4px; border: 1px solid #333; border-radius: 6px; background: linear-gradient(#5a5a5a 0 0) 10px 50% / 40% 6px no-repeat, #1e1e1e; }
+.a-cmdk i { height: 20px; border-radius: 6px; background: linear-gradient(#3a3a3a 0 0) 10px 50% / 55% 6px no-repeat; }
+.a-cmdk::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 48px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgb(236 129 12 / 0.28);
+  animation: pick 3.6s var(--ease) infinite;
+}
+@keyframes pick { 0%, 28% { translate: 0 0; } 34%, 62% { translate: 0 26px; } 68%, 94% { translate: 0 52px; } 100% { translate: 0 0; } }
+
+/* A radar watching over something: the taste's "radar-style alerting". */
+.a-radar { display: grid; place-items: center; background: var(--ink); }
+.a-radar i {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  overflow: hidden;
+  border: 1px solid #3a3a3a;
+  border-radius: 50%;
+  background:
+    linear-gradient(#2c2c2c 0 0) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(#2c2c2c 0 0) 0 50% / 100% 1px no-repeat,
+    radial-gradient(circle, transparent 30%, #2c2c2c 31% 32%, transparent 33% 62%, #2c2c2c 63% 64%, transparent 65%);
+}
+.a-radar i::after { content: ""; position: absolute; inset: 0; background: conic-gradient(transparent 75%, rgb(74 222 128 / 0.55)); animation: spin 2.8s linear infinite; }
+.a-radar b { position: absolute; left: 58%; top: 34%; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+@keyframes spin { to { rotate: 1turn; } }
+
+.a-ascii { display: grid; place-content: center; background: var(--ink); color: #f3f3f3; font: 11px/1.45 var(--mono); white-space: nowrap; }
+.a-ascii::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, var(--hot), var(--red) 55%, var(--blue)); mix-blend-mode: multiply; }
+
+/* Pause: the drift and the demos below move on their own (WCAG 2.2.2). */
+.motion {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--outline);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--on-surface);
+}
+.motion:hover { border-color: var(--quiet); }
+.motion::before { content: ""; width: 10px; height: 12px; background: linear-gradient(90deg, currentColor 0 35%, transparent 0 65%, currentColor 0); }
+.motion[aria-pressed="true"]::before { width: 11px; background: currentColor; clip-path: polygon(10% 0, 100% 50%, 10% 100%); }
+.still :is(.drift, .demo, .pipeline) :is(*, ::before, ::after), .still .pipeline::after { animation-play-state: paused !important; }
+.still .cap { animation-play-state: running, paused !important; }
+
+/* --- Welcome: what it does, in a bento ------------------------------------- */
+
+.part { position: relative; display: grid; gap: 36px; }
+.display {
+  max-width: 44rem;
+  margin: 0;
+  color: var(--on-surface);
+  font: 600 clamp(30px, 4.6vw, 48px)/1.08 var(--sans);
+  letter-spacing: -0.025em;
+}
+.display span { display: block; color: var(--quiet); }
+
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.cell {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 22px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: var(--surface);
+  transition: border-color 200ms ease-out;
+}
+.cell.wide { grid-column: span 3; }
+.cell:hover { border-color: var(--quiet); }
+.cell h3, .stage h3 { margin: 18px 12px 6px; font: 600 16px/1.3 var(--sans); letter-spacing: -0.01em; }
+.cell > p, .stage > p { margin: 0 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+/* A demo sits on the page color, over the same fine grid as the page's top. */
+.demo, .scene {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) -1px -1px / 24px 24px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) -1px -1px / 24px 24px,
+    var(--neutral);
+}
+.demo { height: 150px; }
+.wide .demo { height: 232px; }
+.demo code, .scene code { font: 12px/1.65 var(--mono); }
+
+/* Shared from three apps: each notice comes in front, then steps back. */
+.toasts { display: grid; place-items: center; }
+.toast {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(310px, 86%);
+  padding: 10px 16px 10px 10px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: var(--surface);
+  animation: stack 9s var(--ease) infinite;
+}
+.toast:nth-child(1) { animation-delay: -1s; }
+.toast:nth-child(2) { animation-delay: -4s; }
+.toast:nth-child(3) { animation-delay: -7s; }
+.toast p { min-width: 0; margin: 0; overflow: hidden; font: 600 14px/1.3 var(--sans); white-space: nowrap; text-overflow: ellipsis; }
+.toast p span { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.src { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--on-surface); color: var(--neutral); font: 600 13px/1 var(--sans); }
+@keyframes stack {
+  0% { z-index: 3; opacity: 0; translate: 0 44px; scale: 1; }
+  8%, 33% { z-index: 3; opacity: 1; translate: 0 0; scale: 1; }
+  41%, 66% { z-index: 2; opacity: 0.7; translate: 0 -15px; scale: 0.94; }
+  74%, 92% { z-index: 1; opacity: 0.35; translate: 0 -30px; scale: 0.88; }
+  100% { z-index: 1; opacity: 0; translate: 0 -38px; scale: 0.84; }
+}
+
+/* Filed: the new capture lands in its topic page. */
+.tree { padding: 20px 24px; color: var(--muted); font: 13px/1.85 var(--mono); }
+.tree p { width: fit-content; margin: 0; white-space: nowrap; }
+.tree .dir { color: var(--on-surface); }
+.tree .in1 { padding-left: 2ch; }
+.tree .in2 { padding-left: 4ch; }
+.tree .new { margin-left: 3ch; padding: 0 1ch; border-radius: 6px; color: var(--on-surface); animation: filed 4.8s ease-out infinite; }
+.tree .new span { color: var(--primary); }
+@keyframes filed {
+  0%, 10% { opacity: 0; translate: -14px 0; background: transparent; }
+  22% { opacity: 1; translate: 0 0; background: color-mix(in srgb, var(--primary) 22%, transparent); }
+  70%, 100% { opacity: 1; translate: 0 0; background: color-mix(in srgb, var(--primary) 8%, transparent); }
+}
+
+/* The taste as tokens: these swatches are this page's own. */
+.tokens { display: grid; align-content: center; justify-items: start; gap: 14px; padding: 0 22px; }
+.swatches { display: flex; }
+.swatches i { width: 32px; height: 32px; margin-left: -8px; border: 2px solid var(--neutral); border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.14); animation: pop 4s ease-in-out infinite; }
+.swatches i:first-child { margin-left: 0; background: var(--on-surface); }
+.swatches i:nth-child(2) { background: var(--surface); animation-delay: 120ms; }
+.swatches i:nth-child(3) { background: var(--primary); animation-delay: 240ms; }
+.swatches i:nth-child(4) { background: var(--tertiary); animation-delay: 360ms; }
+.swatches i:nth-child(5) { background: var(--outline); animation-delay: 480ms; }
+.tokens code { color: var(--muted); }
+@keyframes pop { 0%, 64%, 100% { translate: 0 0; } 72% { translate: 0 -6px; } }
+
+/* Collections: three folders, fanned out further on hover. */
+.folders { display: grid; place-items: center; }
+.folders span {
+  position: relative;
+  grid-area: 1 / 1;
+  width: 150px;
+  padding: 22px 16px 14px;
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 600 12px/1 var(--sans);
+  transition: rotate 400ms var(--ease), translate 400ms var(--ease);
+}
+.folders span::before { content: ""; position: absolute; top: 9px; left: 16px; width: 28px; height: 5px; border-radius: 3px; background: var(--outline); }
+.folders span:nth-child(1) { rotate: -9deg; translate: -26px 8px; }
+.folders span:nth-child(2) { rotate: 7deg; translate: 26px 2px; }
+.folders span:nth-child(3) { translate: 0 -6px; color: var(--on-surface); }
+.folders span:nth-child(3)::before { background: var(--primary); }
+.cell:hover .folders span:nth-child(1) { rotate: -15deg; translate: -48px 10px; }
+.cell:hover .folders span:nth-child(2) { rotate: 12deg; translate: 48px 4px; }
+
+/* Your agents, connected. */
+.agents { display: grid; align-content: center; gap: 16px; padding: 0 18px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { padding: 7px 11px; border: 1px solid var(--outline); border-radius: 9999px; background: var(--surface); font: 500 12px/1 var(--sans); letter-spacing: 0.01em; }
+.agents code b { color: var(--muted); font-weight: 400; }
+.agents code i { color: var(--ok); font-style: normal; animation: connected 3.2s ease-out infinite; }
+@keyframes connected { 0%, 30% { opacity: 0; } 42%, 100% { opacity: 1; } }
+
+/* --- Welcome: the loop, from a share to a build ------------------------------
+   Four stages on one 12s clock. A dot runs along the rail above them, and each
+   stage takes its turn: its outline lights up and its scene plays (the parts come
+   in one after another, then hold), while the others keep their finished state.
+   --phase shifts a stage's place on the clock. Every part's resting style is its
+   finished state, so with motion reduced the stages are simply complete. */
+
+.pipeline {
+  --cycle: 12s;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 30px 0 0;
+  list-style: none;
+}
+.pipeline::before {  /* the rail, with a tick over each stage */
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 1px;
+  background: var(--outline);
+}
+.pipeline::after {  /* the dot on it */
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: calc(12.5% - 4.5px);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px var(--neutral);
+  animation: rail var(--cycle) var(--ease) infinite;
+}
+@keyframes rail {
+  0%, 20% { left: calc(12.5% - 4.5px); }
+  25%, 45% { left: calc(37.5% - 4.5px); }
+  50%, 70% { left: calc(62.5% - 4.5px); }
+  75%, 95% { left: calc(87.5% - 4.5px); }
+  100% { left: calc(12.5% - 4.5px); }
+}
+
+.stage {
+  --phase: 0s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 22px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: var(--surface);
+  animation: stage-on var(--cycle) ease-in-out var(--phase) infinite;
+}
+.stage::before {  /* the tick on the rail */
+  content: "";
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  width: 1px;
+  height: 9px;
+  background: var(--outline);
+}
+.s2 { --phase: -9s; }
+.s3 { --phase: -6s; }
+.s4 { --phase: -3s; }
+.stage h3 b { margin-right: 8px; color: var(--quiet); font: 500 12px/1 var(--mono); letter-spacing: 0.04em; animation: num-on var(--cycle) ease-in-out var(--phase) infinite; }
+@keyframes stage-on { 0%, 23% { border-color: var(--primary); } 27%, 100% { border-color: var(--outline); } }
+@keyframes num-on { 0%, 23% { color: var(--primary); } 27%, 100% { color: var(--quiet); } }
+
+.scene { height: 184px; }
+/* The parts of a scene come in during its stage's turn (the first quarter of the
+   clock), one step apart, and hold until the turn comes round again. */
+.scene .a, .scene .b, .scene .c, .scene .d, .scene .e { animation: var(--cycle) var(--ease) var(--phase) infinite both; }
+.scene .a { animation-name: in-a; }
+.scene .b { animation-name: in-b; }
+.scene .c { animation-name: in-c; }
+.scene .d { animation-name: in-d; }
+.scene .e { animation-name: in-e; }
+@keyframes in-a { 0%, 3% { opacity: 0; translate: 0 8px; } 8%, 95% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 0; } }
+@keyframes in-b { 0%, 7% { opacity: 0; translate: 0 8px; } 12%, 95% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 0; } }
+@keyframes in-c { 0%, 11% { opacity: 0; translate: 0 8px; } 16%, 95% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 0; } }
+@keyframes in-d { 0%, 15% { opacity: 0; translate: 0 8px; } 20%, 95% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 0; } }
+@keyframes in-e { 0%, 19% { opacity: 0; translate: 0 8px; } 24%, 95% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 0; } }
+
+/* 01 Share: a picture made of pixels, the Share sheet, and second-brain picked. */
+.share { display: grid; justify-items: start; padding: 16px 0 0 16px; }
+.shot { display: grid; grid-template-columns: repeat(6, 18px); grid-auto-rows: 18px; gap: 3px; }
+.shot i { border-radius: 3px; background: var(--outline); }
+.shot i:nth-child(3n) { background: var(--primary); }
+.shot i:nth-child(4n + 1) { background: var(--on-surface); }
+.shot i:nth-child(7n) { background: var(--tertiary); }
+.shot i:nth-child(5n + 2) { background: var(--quiet); }
+.sheet {
+  position: absolute;
+  inset: auto 8px 8px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 12px;
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.sheet i { width: 30px; height: 30px; border-radius: 8px; background: var(--outline); }
+.sheet i.me { position: relative; background: var(--primary); animation: me-on var(--cycle) var(--ease) var(--phase) infinite both; }
+.sheet i.me::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--primary); border-radius: 11px; }
+@keyframes me-on { 0%, 11% { background: var(--outline); scale: 1; } 14% { scale: 0.9; } 17%, 95% { background: var(--primary); scale: 1; } 100% { background: var(--outline); } }
+.saved {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 9px;
+  border-radius: 9999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font: 500 11px/1.2 var(--mono);
+}
+
+/* 02 Read: a vision model sweeps the frames like a radar; what it finds lights up. */
+.radar { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 10px; }
+.scope {
+  position: relative;
+  flex: none;
+  width: 108px;
+  height: 108px;
+  overflow: hidden;
+  border: 1px solid var(--outline);
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--outline) 0 0) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--outline) 0 0) 0 50% / 100% 1px no-repeat,
+    radial-gradient(circle, transparent 31%, var(--outline) 32% 33%, transparent 34% 64%, var(--outline) 65% 66%, transparent 67%),
+    var(--surface);
+}
+.sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(transparent 72%, color-mix(in srgb, var(--primary) 55%, transparent)); animation: spin 3s linear infinite; }
+.blip { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+.blip::after { content: ""; position: absolute; inset: -5px; border: 1px solid var(--primary); border-radius: 50%; opacity: 0.5; }
+.blip.a { left: 66%; top: 26%; }
+.blip.b { left: 24%; top: 40%; }
+.blip.c { left: 56%; top: 68%; }
+.hits { display: grid; justify-items: start; gap: 6px; margin: 0; }
+.hits span { padding: 4px 9px; border-radius: 9999px; background: var(--tertiary); color: var(--on-tertiary); font: 500 11px/1.2 var(--mono); }
+.hits span.d { padding: 2px 0 0; background: none; color: var(--muted); font-size: 10px; white-space: nowrap; }
+
+/* 03 Distill: the DESIGN.md writes itself, line by line. */
+.distill { padding: 12px 14px; font: 12px/1 var(--mono); }
+.distill .file { display: flex; justify-content: space-between; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--outline); color: var(--on-surface); }
+.distill .file span { color: var(--muted); }
+.distill .ln { display: flex; align-items: center; justify-content: space-between; margin: 0 0 9px; color: var(--muted); }
+.distill .ln b { color: var(--on-surface); font-weight: 500; }
+.distill .sw { width: 22px; height: 12px; border-radius: 3px; }
+.distill .sw.p { background: var(--primary); }
+.distill .sw.t { background: var(--tertiary); }
+
+/* 04 Build: the agent is asked, and a card is put together in those tokens. */
+.build { display: grid; align-content: start; gap: 10px; padding: 12px 14px; }
+.prompt { width: 100%; overflow: hidden; color: var(--on-surface); font: 12px/1.3 var(--mono); white-space: nowrap; }
+.prompt b { color: var(--primary); font-weight: 500; }
+.ui { display: grid; gap: 9px; padding: 12px; border: 1px solid var(--outline); border-radius: 10px; background: var(--surface); }
+.ui > i, .ui-row > i { display: block; height: 7px; border-radius: 4px; background: var(--on-surface); }
+.ui > i { width: 46%; height: 9px; }
+.ui-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ui-row > i { width: 52%; background: var(--outline); }
+.ui-row > i.short { width: 36%; }
+.ui-row > b { position: relative; flex: none; width: 26px; height: 15px; border-radius: 9999px; background: var(--primary); }
+.ui-row > b::after { content: ""; position: absolute; top: 2px; right: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--on-primary); }
+.ui-row > b.off { background: var(--outline); }
+.ui-row > b.off::after { right: auto; left: 2px; background: var(--neutral); }
+.ui > .btn { justify-self: end; padding: 6px 12px; border-radius: 6px; background: var(--primary); color: var(--on-primary); font: 500 11px/1 var(--sans); }
+
+/* --- Welcome: the way in ------------------------------------------------------ */
+
+.outro { justify-items: center; gap: 28px; padding-bottom: 24px; text-align: center; }
+.outro .eyebrow { margin: 0 0 -12px; }
+.outro .muted { max-width: 30rem; }
+
+/* Sections rise in as they scroll into view, where the browser can tie it to scrolling. */
+@supports (animation-timeline: view()) {
+  .reveal { animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 22%; }
+}
+@keyframes reveal { from { opacity: 0; translate: 0 40px; } }
+
+/* --- What was shared, the install banner ------------------------------------- */
+
+.shared { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--outline); border-radius: 16px; background: var(--surface); }
+.shared img { display: block; max-width: 100%; max-height: 50vh; margin: 0 auto; border-radius: 10px; }
+.shared .kind { margin: 0; color: var(--muted); font: 500 13px/1.2 var(--sans); }
 .shared .link { justify-self: start; font: 500 14px/1.2 var(--sans); }
 
 .install {
@@ -177,64 +880,67 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 40px;
-  padding: 12px 12px 12px 24px;
+  margin: 8px 0 16px;
+  padding: 10px 10px 10px 18px;
   border: 1px solid var(--outline);
+  border-radius: 16px;
   background: var(--surface);
 }
+.install p { font-size: 14px; }
 
-.muted { color: var(--secondary); font-size: 14px; }
+.muted { color: var(--muted); font-size: 14px; }
 
-#extras { display: grid; gap: 12px; margin-top: 16px; }
-#extras h2 { margin: 28px 0 0; }
-#extras h2:first-child { margin-top: 0; }
-#extras > p:last-child { margin-top: 28px; }
+#extras { display: grid; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--outline); }
+#extras h2:first-child { margin-top: 20px; }
+#extras > p:last-child { margin-top: 20px; }
 
-/* --- Status: sent, waiting to send, error ----------------------------------- */
+/* --- Status: sent, waiting to send, error ------------------------------------ */
 
 .status { font: 500 14px/1.4 var(--sans); }
 .status:empty { display: none; }
 /* Sending and preparing are shown on the button; the line still tells a screen reader. */
 .status.busy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* A notice: a mark in a 20px square, then the message. */
+/* A notice: a mark in a 22px circle, then the message. */
 .status.ok, .status.error, .queue {
   position: relative;
-  padding: 12px 16px 12px 48px;
+  padding: 14px 16px 14px 54px;
   border: 1px solid var(--outline);
+  border-radius: 16px;
   background: var(--surface);
   color: var(--on-surface);
-  animation: notice-in 200ms ease-out;
+  animation: notice-in 240ms ease-out;
 }
 .status.ok::before, .status.error::before, .queue::before {
   content: "";
   position: absolute;
-  top: 12px;
-  left: 16px;
-  width: 20px;
-  height: 20px;
+  top: 14px;
+  left: 18px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
 }
-/* Sent: a check drawn in the second accent, short stroke then long. */
-.status.ok::before { background: var(--tertiary); }
+/* Sent: a check on the main accent, short stroke then long. */
+.status.ok::before { background: var(--primary); }
 .status.ok::after {
   content: "";
   position: absolute;
-  top: 14px;
-  left: 23px;
-  width: 6px;
-  height: 11px;
-  border: solid var(--on-tertiary);
+  top: 20px;
+  left: 26px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--on-primary);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
   animation: draw 320ms ease-out 80ms both;
 }
-/* Error: an exclamation mark on the hot accent. */
+/* Error: an exclamation mark on red. */
 .status.error::before {
   content: "!";
   content: "!" / "";
-  background: var(--primary);
-  color: var(--on-primary);
-  font: 700 14px/20px var(--sans);
+  background: var(--danger);
+  color: var(--on-danger);
+  font: 700 14px/22px var(--sans);
   text-align: center;
 }
 /* Waiting to send: a clock, and a way to retry. */
@@ -249,16 +955,15 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
 }
 .queue p { flex: 1 1 14rem; }
 .queue .muted { font-weight: 400; }
-.queue .secondary { background: var(--neutral); }
-.queue::before { border: 2px solid var(--secondary); border-radius: 50%; }
+.queue::before { border: 2px solid var(--muted); }
 .queue::after {
   content: "";
   position: absolute;
-  top: 17px;
-  left: 25px;
+  top: 20px;
+  left: 28px;
   width: 5px;
-  height: 6px;
-  border: solid var(--secondary);
+  height: 7px;
+  border: solid var(--muted);
   border-width: 0 0 2px 2px;
 }
 
@@ -269,31 +974,45 @@ button { border-radius: 0; font: 500 14px/1.2 var(--sans); letter-spacing: 0.01e
   to { clip-path: inset(0); }
 }
 
-/* --- Footer, dropping an image ---------------------------------------------- */
+/* --- Dropping an image ------------------------------------------------------- */
 
-footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 64px;
-  padding-top: 24px;
-  border-top: 1px solid var(--outline);
-  color: var(--secondary);
-  font: 500 14px/1.4 var(--sans);
+body.dragging main { outline: 2px dashed var(--primary); outline-offset: -12px; border-radius: 24px; }
+
+/* --- Small screens, reduced motion ------------------------------------------- */
+
+/* The bento and the loop: two columns on a tablet, one on a phone. */
+@media (max-width: 56rem) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cell, .cell.wide { grid-column: span 1; }
+  .cell.wide { grid-column: span 2; }
+  .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 0; }
+  .pipeline::before, .pipeline::after, .stage::before { display: none; }
 }
-footer .link { color: var(--secondary); }
 
-body.dragging main { outline: 2px dashed var(--tertiary); outline-offset: -12px; }
-
-/* --- Small screens, reduced motion ------------------------------------------ */
+/* A phone: fewer, smaller cards, all above the title, and nothing behind the words. */
+@media (max-width: 45rem) {
+  [data-screen="welcome"] main > header { margin-top: clamp(72px, 21vh, 190px); }
+  .hero { padding-bottom: 32px; }
+  .cap { width: 180px; }
+  .c3, .c4, .c5, .c7, .c8, .c9, .c10, .c11 { display: none; }
+  .c1 { left: -14%; top: 8%; --s: 0.7; }
+  .c6 { right: -12%; top: 6%; --s: 0.68; }
+  .c2 { left: 36%; top: 1%; --s: 0.5; }
+  .drift::after { background: linear-gradient(to bottom, transparent 18%, var(--neutral) 34%); }
+}
 
 @media (max-width: 30rem) {
+  .bar { padding-inline: 16px; }
+  main { padding-inline: 16px; }
   .actions > * { flex: 1 1 auto; }
+  .bento, .pipeline { grid-template-columns: minmax(0, 1fr); }
+  .cell, .cell.wide { grid-column: auto; }
+  #capture, #settings { padding: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation: none !important; transition: none !important; }
+  .motion { display: none; }
   .dots i:nth-child(2) { opacity: 0.6; }
   .dots i:nth-child(3) { opacity: 0.3; }
 }
