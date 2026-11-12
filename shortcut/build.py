@@ -109,7 +109,7 @@ def build() -> dict:
                     WFChooseFromListActionPrompt="What caught your eye?")
     # A separate action: "Ask Each Time" inside the JSON body makes Shortcuts ask
     # for the whole dictionary instead of the note alone.
-    note = action("ask", WFAskActionPrompt="What do you want from this? For Idea to grow, the thought it gave you (optional)", WFInputType="Text")
+    note = action("ask", WFAskActionPrompt="What do you want from this? If you chose Idea to grow, write the thought it gave you: without it nothing is planted in hypar", WFInputType="Text")
 
     def note_body():  # rebuilt per branch: it references the intent and note outputs
         return text("intent: ", output(intent, "Chosen Item"), " — ", output(note, "Provided Input"))
@@ -194,7 +194,7 @@ def build_github() -> dict:
     intents = action("list", WFItems=["Pattern to reuse", "Visual style", "Tool to try", "Idea to read", "Idea to grow", "Just save"])
     intent = action("choosefromlist", WFInput=attachment(output(intents, "List")),
                     WFChooseFromListActionPrompt="What caught your eye?")
-    note = action("ask", WFAskActionPrompt="What do you want from this? For Idea to grow, the thought it gave you (optional)", WFInputType="Text")
+    note = action("ask", WFAskActionPrompt="What do you want from this? If you chose Idea to grow, write the thought it gave you: without it nothing is planted in hypar", WFInputType="Text")
     # A random file name; the worker files the queue in name order.
     name = action("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
 
