@@ -134,17 +134,21 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
 
     # Already filed: nothing to do, unless the note carries a style or new collections.
     if existing and not reanalyze and not style:
+        # Sharing a filed link again as "Idea to grow" with a note plants it: the
+        # first share may have had no note, or hypar may have been down.
+        grown = grow_filed(url, vlm_note, intent, existing)
+        suffix = grown_text(grown)
         new = [c for c in collections if c not in wiki.note_collections(existing[1])]
         if not new:
-            return {"text": f"already filed: #{existing[0]}", "already": True}
+            return {"text": f"already filed: #{existing[0]}{suffix}", "already": True, **grown}
         wiki.join_collections(existing[0], new)  # no re-analysis: only the frontmatter changes
         wiki.build_index()
         try:
             commit_wiki(f"docs(wiki): add #{existing[0]} to {', '.join(new)}", url)
         except Exception as e:  # it's in the local wiki and goes out with the next push
             print(f"[worker] wiki commit failed: {e}", file=sys.stderr)
-        return {"text": f"already filed: #{existing[0]}, added to {', '.join(new)}", "already": True,
-                "collected": new}
+        return {"text": f"already filed: #{existing[0]}, added to {', '.join(new)}{suffix}", "already": True,
+                "collected": new, **grown}
 
     cid = existing[0] if existing else wiki.next_capture_id()
     captured = str(existing[1].get("captured")) if existing else date.today().isoformat()
@@ -194,9 +198,30 @@ def _ingest(url: str, source: str, note: str | None, *, reanalyze: bool = False,
         hypar.sync_index(wiki.WIKI)
     if intent == hypar.INTENT and not reanalyze:
         result.update(grow(url, vlm_note, entry))
-        result["text"] += (f" · planted in hypar ({result['embryo']['id']})" if "embryo" in result
-                           else f" · not planted in hypar: {result['hypar_error']}")
+        result["text"] += grown_text(result)
     return result
+
+
+def grown_text(result: dict) -> str:
+    if "embryo" in result:
+        return f" · planted in hypar ({result['embryo']['id']})"
+    if "hypar_error" in result:
+        return f" · not planted in hypar: {result['hypar_error']}"
+    return ""
+
+
+def grow_filed(url: str, note: str | None, intent: str | None, existing: tuple[int, dict]) -> dict:
+    """grow() for a capture that is already filed. Only with a note: a re-share
+    without one is just "already filed", not a failed plant. hypar ignores a URL
+    it already has, so repeating this is safe."""
+    if intent != hypar.INTENT or not note:
+        return {}
+    cid, meta = existing
+    source = next((f for f in wiki.source_files() if wiki.capture_number(f.name) == cid), None)
+    if not source:
+        return {}
+    return grow(url, note, {"source": str(source.relative_to(wiki.WIKI)), "title": meta.get("title") or "",
+                            "summary": meta.get("summary") or ""})
 
 
 def grow(url: str, note: str | None, entry: dict) -> dict:
@@ -274,6 +299,11 @@ def notify(url: str, result: dict):
         title, message, tags = f"Added to {', '.join(result['collected'])}", url, ["white_check_mark"]
     elif result.get("already"):
         title, message, tags = "Already saved", url, ["information_source"]
+        if embryo := result.get("embryo"):
+            title, message, tags = "Planted in hypar", "Already saved; planted as a latent embryo", ["white_check_mark"]
+            url = hypar.embryo_url(embryo["id"])
+        elif "hypar_error" in result:
+            message, tags = f"Already saved\nNot planted in hypar: {result['hypar_error']}", ["warning"]
     else:
         title, message, tags = "Capture failed", result.get("error") or result["text"], ["warning"]
 
